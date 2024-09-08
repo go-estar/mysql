@@ -1,7 +1,6 @@
 package mysql
 
 import (
-	"github.com/pkg/errors"
 	"reflect"
 	"regexp"
 	"strings"
@@ -15,11 +14,11 @@ type UniqueIndexError struct {
 func GetUniqueIndex(model interface{}) ([]UniqueIndexError, error) {
 	result, err := ModelMethod(model, "UniqueIndexErrors")
 	if err != nil {
-		return nil, errors.WithStack(ErrorUniqueIndexUnset)
+		return nil, WithStack(ErrorUniqueIndexUnset)
 	}
 	errs, ok := result.([]UniqueIndexError)
 	if !ok {
-		return nil, errors.WithStack(ErrorUniqueIndexType)
+		return nil, WithStack(ErrorUniqueIndexType)
 	}
 	return errs, nil
 }
@@ -28,7 +27,7 @@ func GetIndexName(msg string) (string, error) {
 	exp := regexp.MustCompile(`for key '(.*?)'`)
 	result := exp.FindAllStringSubmatch(msg, 1)
 	if !(len(result) == 1 && len(result[0]) == 2) {
-		return "", errors.WithStack(ErrorUniqueIndexNameEmpty)
+		return "", WithStack(ErrorUniqueIndexNameEmpty)
 	}
 	return result[0][1], nil
 }
@@ -40,7 +39,7 @@ func GetFieldValue(model interface{}, fieldName string) (interface{}, error) {
 	}
 	field := modelV.FieldByName(fieldName)
 	if !field.IsValid() {
-		return nil, errors.WithStack(ErrorUniqueIndexColumnUnset)
+		return nil, WithStack(ErrorUniqueIndexColumnUnset)
 	}
 	return field.Interface(), nil
 }
@@ -53,7 +52,7 @@ func GetUniqueIndexError(model interface{}, error string) error {
 	}
 
 	if len(uniqueIndexErrors) == 0 {
-		return errors.WithStack(ErrorUniqueIndexEmpty)
+		return WithStack(ErrorUniqueIndexEmpty)
 	}
 
 	indexName, err := GetIndexName(error)
@@ -73,9 +72,9 @@ func GetUniqueIndexError(model interface{}, error string) error {
 			if uniqueIndexErr != nil {
 				return uniqueIndexErr
 			} else {
-				return errors.WithStack(ErrorUniqueIndexMessageUnset)
+				return WithStack(ErrorUniqueIndexMessageUnset)
 			}
 		}
 	}
-	return errors.WithStack(ErrorUniqueIndexMisMatch)
+	return WithStack(ErrorUniqueIndexMisMatch)
 }

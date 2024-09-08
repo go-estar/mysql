@@ -3,7 +3,6 @@ package mysql
 import (
 	stderrors "errors"
 	"fmt"
-	"github.com/pkg/errors"
 	"reflect"
 	"strings"
 )
@@ -95,15 +94,15 @@ func (db *DB) getUpdateValue(model interface{}, value interface{}) (map[string]i
 	//value类型必须是struct,map及struct的指针
 	if valueV.Kind() == reflect.Ptr {
 		if reflect.ValueOf(value).Elem().Kind() == reflect.Map {
-			return nil, errors.WithStack(ErrorUpdateValuePtrUseMap)
+			return nil, WithStack(ErrorUpdateValuePtrUseMap)
 		}
 		if reflect.ValueOf(value).Elem().Kind() != reflect.Struct {
-			return nil, errors.WithStack(ErrorUpdateValuePtrNotStruct)
+			return nil, WithStack(ErrorUpdateValuePtrNotStruct)
 		}
 		valueV = valueV.Elem()
 		valueT = valueT.Elem()
 	} else if !(valueV.Kind() == reflect.Struct || valueV.Kind() == reflect.Map) {
-		return nil, errors.WithStack(ErrorUpdateValueNotStructOrMap)
+		return nil, WithStack(ErrorUpdateValueNotStructOrMap)
 	}
 
 	modelV := reflect.ValueOf(model)
@@ -169,17 +168,17 @@ func (db *DB) validatePK(model interface{}, primaryKey ...string) (*PK, error) {
 	} else {
 		pkField := GetPKField(model)
 		if pkField.Name == "" {
-			return nil, errors.WithStack(ErrorPrimaryKeyUnset)
+			return nil, WithStack(ErrorPrimaryKeyUnset)
 		}
 		pkName = pkField.Name
 	}
 
 	fieldV := modelV.FieldByName(pkName)
 	if !fieldV.IsValid() {
-		return nil, errors.WithStack(ErrorPrimaryKeyInvalid)
+		return nil, WithStack(ErrorPrimaryKeyInvalid)
 	}
 	if fieldV.IsZero() {
-		return nil, errors.WithStack(ErrorPrimaryKeyEmpty)
+		return nil, WithStack(ErrorPrimaryKeyEmpty)
 	}
 
 	return &PK{
@@ -196,7 +195,7 @@ func (db *DB) setPKValue(model interface{}, pkFieldName string, value interface{
 
 	fieldV := modelV.FieldByName(pkFieldName)
 	if !(fieldV.IsValid() && fieldV.CanSet()) {
-		return errors.WithStack(ErrorPrimaryKeyInvalid)
+		return WithStack(ErrorPrimaryKeyInvalid)
 	}
 	fieldV.Set(reflect.ValueOf(value))
 	return nil
@@ -254,11 +253,11 @@ func ModelMethod(model interface{}, methodName string) (r interface{}, err error
 func GetRecordNotFoundError(model interface{}) error {
 	result, err := ModelMethod(model, "RecordNotFoundError")
 	if err != nil {
-		return errors.WithStack(ErrorRecordNotFound)
+		return WithStack(ErrorRecordNotFound)
 	}
 	e, ok := result.(error)
 	if !ok {
-		return errors.WithStack(ErrorRecordNotFound)
+		return WithStack(ErrorRecordNotFound)
 	}
 	return e
 }
@@ -266,11 +265,11 @@ func GetRecordNotFoundError(model interface{}) error {
 func GetRecordNotAffectedError(model interface{}) error {
 	result, err := ModelMethod(model, "NoRecordAffectedError")
 	if err != nil {
-		return errors.WithStack(ErrorRecordNotAffected)
+		return WithStack(ErrorRecordNotAffected)
 	}
 	e, ok := result.(error)
 	if !ok {
-		return errors.WithStack(ErrorRecordNotAffected)
+		return WithStack(ErrorRecordNotAffected)
 	}
 	return e
 }

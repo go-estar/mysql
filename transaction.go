@@ -10,7 +10,7 @@ func (db *DB) Transaction(f func(tx *gorm.DB) error) (err error) {
 	tx := db.DB.Begin()
 	defer func() {
 		if e := recover(); e != nil {
-			err = errors.New(fmt.Sprint(e))
+			err = WithStack(errors.New(fmt.Sprint(e)))
 			tx.Rollback()
 		}
 	}()

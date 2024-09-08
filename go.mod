@@ -5,7 +5,7 @@ go 1.21.0
 require (
 	github.com/go-estar/config v1.0.0
 	github.com/go-estar/logger v1.0.0
-	github.com/go-estar/types v1.0.0
+	github.com/go-estar/types v1.0.1
 	github.com/go-sql-driver/mysql v1.8.1
 	github.com/jinzhu/copier v0.4.0
 	github.com/pkg/errors v0.9.1

@@ -2,7 +2,6 @@ package mysql
 
 import (
 	"encoding/json"
-	"github.com/pkg/errors"
 	"reflect"
 	"time"
 )
@@ -50,7 +49,7 @@ func (b *BaseService[T]) GetPk() (string, error) {
 	pkField := GetPKField(&t)
 	pkName := pkField.Name
 	if pkName == "" {
-		return "", errors.WithStack(ErrorPrimaryKeyUnset)
+		return "", WithStack(ErrorPrimaryKeyUnset)
 	}
 	b.Pk = pkName
 	return b.Pk, nil
