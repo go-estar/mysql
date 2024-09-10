@@ -45,8 +45,8 @@ func (b *BaseService[T]) GetPk() (string, error) {
 	if b.Pk != "" {
 		return b.Pk, nil
 	}
-	t := new(T)
-	pkField := GetPKField(&t)
+	t := b.GetModel()
+	pkField := GetPKField(t)
 	pkName := pkField.Name
 	if pkName == "" {
 		return "", WithStack(ErrorPrimaryKeyUnset)
@@ -63,8 +63,7 @@ func (b *BaseService[T]) GetModel() *T {
 }
 
 func (b *BaseService[T]) NewModel() *T {
-	t := *new(T)
-	return &t
+	return new(T)
 }
 
 func (b *BaseService[T]) NewModelWithId(id interface{}) (*T, error) {
@@ -72,7 +71,7 @@ func (b *BaseService[T]) NewModelWithId(id interface{}) (*T, error) {
 	if err != nil {
 		return nil, err
 	}
-	t := *new(T)
+	t := new(T)
 	model := reflect.New(reflect.TypeOf(t).Elem())
 	modelV := model.Elem()
 	modelFieldV := modelV.FieldByName(pk)
