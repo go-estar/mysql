@@ -79,6 +79,118 @@ func (b *BaseService[T]) NewModelWithId(id interface{}) (*T, error) {
 	return model.Interface().(*T), nil
 }
 
+func (b *BaseService[T]) FindTitle(id interface{}, filters ...map[string]interface{}) (*TitleRes, error) {
+	model, err := b.FindById(id, filters...)
+	if err != nil {
+		return nil, err
+	}
+	return &TitleRes{Title: b.GetTitle(model)}, nil
+}
+
+func (b *BaseService[T]) FindById(id interface{}, filters ...map[string]interface{}) (*T, error) {
+	model, err := b.NewModelWithId(id)
+	if err != nil {
+		return nil, err
+	}
+	if err := b.DB.FindById(
+		model,
+		b.DB.WithFilters(filters...),
+	); err != nil {
+		return nil, err
+	}
+	return model, nil
+}
+
+
+func (b *BaseService[T]) FindByIdWithOpts(id interface{}, opts ...Option) (*T, error) {
+	model, err := b.NewModelWithId(id)
+	if err != nil {
+		return nil, err
+	}
+	if err := b.DB.FindById(
+		model,
+		opts...,
+	); err != nil {
+		return nil, err
+	}
+	return model, nil
+}
+
+func (b *BaseService[T]) FindOne(filters ...map[string]interface{}) (*T, error) {
+	model := b.NewModel()
+	if err := b.DB.FindOne(
+		model,
+		b.DB.WithFilters(filters...),
+	); err != nil {
+		return nil, err
+	}
+	return model, nil
+}
+
+func (b *BaseService[T]) FindOneWithOpts(opts ...Option) (*T, error) {
+	model := b.NewModel()
+	if err := b.DB.FindOne(
+		model,
+		opts...,
+	); err != nil {
+		return nil, err
+	}
+	return model, nil
+}
+
+func (b *BaseService[T]) FindAll(filters ...map[string]interface{}) (*[]*T, error) {
+	model := b.GetModel()
+	list := reflect.New(reflect.SliceOf(reflect.TypeOf(model)))
+	err := b.DB.FindAll(
+		list.Interface(),
+		b.DB.WithFilters(filters...),
+	)
+	if err != nil {
+		return nil, err
+	}
+	return list.Interface().(*[]*T), nil
+}
+
+func (b *BaseService[T]) FindAllWithOpts(opts ...Option) (*[]*T, error) {
+	model := b.GetModel()
+	list := reflect.New(reflect.SliceOf(reflect.TypeOf(model)))
+	err := b.DB.FindAll(
+		list.Interface(),
+		opts...,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return list.Interface().(*[]*T), nil
+}
+
+func (b *BaseService[T]) FindPage(pageable *Pageable, filters ...map[string]interface{}) (*PageRes[T], error) {
+	model := b.GetModel()
+	list := reflect.New(reflect.SliceOf(reflect.TypeOf(model)))
+	total, err := b.DB.FindPage(
+		list.Interface(),
+		b.DB.WithFilters(filters...),
+		b.DB.WithPageable(pageable),
+	)
+	if err != nil {
+		return nil, err
+	}
+	return &PageRes[T]{Total: total, List: list.Interface().(*[]*T)}, nil
+}
+
+func (b *BaseService[T]) FindPageWithOpts(opts ...Option) (*PageRes[T], error) {
+	model := b.GetModel()
+	list := reflect.New(reflect.SliceOf(reflect.TypeOf(model)))
+	total, err := b.DB.FindPage(
+		list.Interface(),
+		opts...,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return &PageRes[T]{Total: total, List: list.Interface().(*[]*T)}, nil
+}
+
 func (b *BaseService[T]) Create(value *T) (*T, error) {
 	err := b.DB.Create(value)
 	return value, err
@@ -112,13 +224,62 @@ func (b *BaseService[T]) UpdateWithUserId(value *T, userId int, filters ...map[s
 	return b.Update(value, filters...)
 }
 
-func (b *BaseService[T]) UpdateOrCreateWithUserId(value *T, userId int, filters ...map[string]interface{}) (*T, error) {
-	SetUpdatedBy(value, userId)
-	r, err := b.Update(value, filters...)
-	if err != nil && IsRecordNotFoundError(err) {
-		return b.CreateWithUserId(value, userId)
+func (b *BaseService[T]) UpdateById(id interface{}, value interface{}, filters ...map[string]interface{}) (*T, error) {
+	model, err := b.NewModelWithId(id)
+	if err != nil {
+		return nil, err
 	}
-	return r, err
+	if err := b.DB.UpdateById(
+		model,
+		value,
+		b.DB.WithOmit("createdAt", "createdBy"),
+		b.DB.WithFilters(filters...),
+	); err != nil {
+		return nil, err
+	}
+	if err := b.DB.FindById(
+		model,
+	); err != nil {
+		return nil, err
+	}
+	return model, err
+}
+
+func (b *BaseService[T]) UpdateByIdWithUserId(id interface{}, value interface{}, userId int, filters ...map[string]interface{}) (*T, error) {
+	SetUpdatedBy(value, userId)
+	return b.UpdateById(id, value, filters...)
+}
+
+func (b *BaseService[T]) UpdateOneOrCreate(value *T, filters ...map[string]interface{}) (*T, error) {
+	if err := b.DB.UpdateOne(
+		value,
+		value,
+		b.DB.WithOmit("createdAt", "createdBy"),
+		b.DB.WithFilters(filters...),
+	); err != nil {
+		if IsRecordNotFoundError(err) {
+			return b.Create(value)
+		}
+		return nil, err
+	}
+	return value, nil
+}
+
+func (b *BaseService[T]) UpdateOneOrCreateWithUserId(value *T, userId int, filters ...map[string]interface{}) (*T, error) {
+	SetUpdatedBy(value, userId)
+	if err := b.DB.UpdateOne(
+		value,
+		value,
+		b.DB.WithOmit("createdAt", "createdBy"),
+		b.DB.WithFilters(filters...),
+	); err != nil {
+		if IsRecordNotFoundError(err) {
+			SetCreatedBy(value, userId)
+			return b.Create(value)
+		}
+		return nil, err
+	}
+	return value, nil
 }
 
 func (b *BaseService[T]) Remove(value *T, filters ...map[string]interface{}) error {
@@ -131,82 +292,26 @@ func (b *BaseService[T]) Remove(value *T, filters ...map[string]interface{}) err
 	)
 }
 
-func (b *BaseService[T]) RemoveById(id interface{}, filters ...map[string]interface{}) error {
-	value, err := b.NewModelWithId(id)
-	if err != nil {
-		return err
-	}
-	return b.Remove(value, filters...)
-}
-
-func (b *BaseService[T]) RemoveByIdWithUserId(id interface{}, userId int, filters ...map[string]interface{}) error {
-	value, err := b.NewModelWithId(id)
-	if err != nil {
-		return err
-	}
+func (b *BaseService[T]) RemoveWithUserId(value *T, userId int, filters ...map[string]interface{}) error {
 	SetUpdatedBy(value, userId)
 	return b.Remove(value, filters...)
 }
 
-func (b *BaseService[T]) FindTitle(id interface{}, filters ...map[string]interface{}) (*TitleRes, error) {
-	model, err := b.FindById(id, filters...)
-	if err != nil {
-		return nil, err
-	}
-	return &TitleRes{Title: b.GetTitle(model)}, nil
-}
-
-func (b *BaseService[T]) FindById(id interface{}, filters ...map[string]interface{}) (*T, error) {
+func (b *BaseService[T]) RemoveById(id interface{}, filters ...map[string]interface{}) error {
 	model, err := b.NewModelWithId(id)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	if err := b.DB.FindById(
-		model,
-		b.DB.WithFilters(filters...),
-	); err != nil {
-		return nil, err
-	}
-	return model, nil
+	return b.Remove(model, filters...)
 }
 
-func (b *BaseService[T]) FindAll(filters ...map[string]interface{}) (*[]*T, error) {
-	model := b.GetModel()
-	list := reflect.New(reflect.SliceOf(reflect.TypeOf(model)))
-	err := b.DB.FindAll(
-		list.Interface(),
-		b.DB.WithFilters(filters...),
-	)
+func (b *BaseService[T]) RemoveByIdWithUserId(id interface{}, userId int, filters ...map[string]interface{}) error {
+	model, err := b.NewModelWithId(id)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	return list.Interface().(*[]*T), nil
-}
-
-func (b *BaseService[T]) FindPage(pageable *Pageable, filters ...map[string]interface{}) (*PageRes[T], error) {
-	model := b.GetModel()
-	list := reflect.New(reflect.SliceOf(reflect.TypeOf(model)))
-	total, err := b.DB.FindPage(
-		list.Interface(),
-		b.DB.WithFilters(filters...),
-		b.DB.WithPageable(pageable),
-	)
-	if err != nil {
-		return nil, err
-	}
-	return &PageRes[T]{Total: total, List: list.Interface().(*[]*T)}, nil
-}
-
-func (b *BaseService[T]) FindOne(filters ...map[string]interface{}) (*T, error) {
-	model := b.NewModel()
-	if err := b.DB.FindOne(
-		model,
-		b.DB.WithFilters(filters...),
-		b.DB.WithIgnoreNotFound(),
-	); err != nil {
-		return nil, err
-	}
-	return model, nil
+	SetUpdatedBy(model, userId)
+	return b.Remove(model, filters...)
 }
 
 func SetCreatedBy(value interface{}, userId int) {

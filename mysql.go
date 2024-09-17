@@ -11,6 +11,10 @@ import (
 	"time"
 )
 
+type DB struct {
+	*gorm.DB
+}
+
 type Config struct {
 	Dialect        string `json:"dialect"`
 	Url            string `json:"url"`
@@ -85,7 +89,7 @@ func New(c *Config, opts ...ConfigOption) *DB {
 	if err := dbConfig.Ping(); err != nil {
 		panic(err)
 	}
-	return &DB{Config: c, DB: db}
+	return &DB{DB: db}
 }
 
 type CamelCaseReplacer struct {

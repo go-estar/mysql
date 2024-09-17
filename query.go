@@ -11,11 +11,6 @@ import (
 
 // NOTE When query with struct, GORM will only query with those fields has non-zero value,
 // that means if your field’s value is 0, ”, false or other zero values, it won’t be used to build query conditions
-type DB struct {
-	Config *Config
-	*gorm.DB
-}
-
 func (db *DB) Create(model interface{}, opts ...Option) error {
 	if reflect.TypeOf(model).Kind() != reflect.Ptr || reflect.TypeOf(model).Elem().Kind() != reflect.Struct {
 		return WithStack(ErrorModel)
@@ -328,6 +323,17 @@ func (db *DB) UpdateOneWithChangedValues(model interface{}, values interface{}, 
 		return nil, err
 	}
 	return updates, nil
+}
+
+func (db *DB) UpdateOneOrCreate(model interface{}, opts ...Option) error {
+	err := db.UpdateOne(model, model, opts...)
+	if err != nil {
+		if IsRecordNotFoundError(err) {
+			return db.Create(model, opts...)
+		}
+		return err
+	}
+	return nil
 }
 
 func (db *DB) Find(model interface{}, opts ...Option) error {
