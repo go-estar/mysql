@@ -3,6 +3,7 @@ module github.com/go-estar/mysql
 go 1.21.0
 
 require (
+	github.com/go-estar/base-error v1.0.7
 	github.com/go-estar/config v1.0.0
 	github.com/go-estar/logger v1.0.0
 	github.com/go-estar/types v1.0.1

@@ -18,7 +18,7 @@ func (db *DB) Create(model interface{}, opts ...Option) error {
 	query, _ := db.QueryBuilder(model, opts...)
 	if err := query.Create(model).Error; err != nil {
 		if db.IsUniqueIndexError(err) {
-			return GetUniqueIndexError(model, err.Error())
+			return GetUniqueIndexError(model, err)
 		}
 		return WithStack(err)
 	}
@@ -209,7 +209,7 @@ func (db *DB) update(model interface{}, updates interface{}, query *gorm.DB, que
 	query = query.Updates(updates)
 	if err := query.Error; err != nil {
 		if db.IsUniqueIndexError(err) {
-			return 0, GetUniqueIndexError(model, err.Error())
+			return 0, GetUniqueIndexError(model, err)
 		}
 		return 0, WithStack(err)
 	}

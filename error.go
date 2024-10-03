@@ -17,20 +17,16 @@ var (
 	ErrorPrimaryKeyUnset           = stderrors.New("model primary key is undefined")
 	ErrorPrimaryKeyInvalid         = stderrors.New("model primary key is invalid")
 	ErrorPrimaryKeyEmpty           = stderrors.New("model primary key is empty")
-	ErrorUpdateValuePtrUseMap      = stderrors.New("value is ptr type can't be a map")
-	ErrorUpdateValuePtrNotStruct   = stderrors.New("value is ptr type must be a struct")
-	ErrorUpdateValueNotStructOrMap = stderrors.New("value isn't ptr type must be a struct or map")
+	ErrorUpdateValuePtrUseMap      = stderrors.New("update value is ptr can't be map")
+	ErrorUpdateValuePtrNotStruct   = stderrors.New("update value is ptr must be struct")
+	ErrorUpdateValueNotStructOrMap = stderrors.New("update value isn't ptr must be struct or map")
 	ErrorRecordNotUnique           = stderrors.New("find duplicate record")
 	ErrorRecordNotFound            = stderrors.New("record not found")
 	ErrorRecordNotAffected         = stderrors.New("record for update not found")
 	ErrorPluck                     = stderrors.New("pluck not supplied")
-	ErrorUniqueIndexUnset          = stderrors.New("data duplicate(01)")
-	ErrorUniqueIndexType           = stderrors.New("data duplicate(02)")
-	ErrorUniqueIndexEmpty          = stderrors.New("data duplicate(03)")
-	ErrorUniqueIndexMisMatch       = stderrors.New("data duplicate(04)")
-	ErrorUniqueIndexNameEmpty      = stderrors.New("data duplicate(05)")
-	ErrorUniqueIndexMessageUnset   = stderrors.New("data duplicate(06)")
-	ErrorUniqueIndexColumnUnset    = stderrors.New("data duplicate(07)")
+	ErrorUniqueIndexUnset          = stderrors.New("unique index unset")
+	ErrorUniqueIndexTypeMismatch   = stderrors.New("unique index type mismatch")
+	ErrorUniqueIndexNameEmpty      = stderrors.New("unique index name empty")
 )
 
 func (db *DB) IsUniqueIndexError(err error) bool {
@@ -50,8 +46,9 @@ func (db *DB) IsRecordNotAffectedError(err error) bool {
 }
 
 func IsUniqueIndexError(err error) bool {
-	errType := reflect.TypeOf(err).String()
-	if errType == "*mysql.MySQLError" && err.(*mysql.MySQLError).Number == 1062 {
+	cause := errors.Cause(err)
+	errType := reflect.TypeOf(cause).String()
+	if errType == "*mysql.MySQLError" && cause.(*mysql.MySQLError).Number == 1062 {
 		return true
 	}
 	return false

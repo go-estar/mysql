@@ -1,24 +1,28 @@
 package mysql
 
 import (
-	"reflect"
+	baseError "github.com/go-estar/base-error"
 	"regexp"
 	"strings"
 )
 
 type UniqueIndexError struct {
-	IndexName string
-	Error     error
+	Index string
+	Error *baseError.Error
 }
 
-func GetUniqueIndex(model interface{}) ([]UniqueIndexError, error) {
+func NewUniqueIndexError(index string, err *baseError.Error) *UniqueIndexError {
+	return &UniqueIndexError{Index: index, Error: err}
+}
+
+func GetUniqueIndex(model interface{}) ([]*UniqueIndexError, error) {
 	result, err := ModelMethod(model, "UniqueIndexErrors")
 	if err != nil {
-		return nil, WithStack(ErrorUniqueIndexUnset)
+		return nil, ErrorUniqueIndexUnset
 	}
-	errs, ok := result.([]UniqueIndexError)
+	errs, ok := result.([]*UniqueIndexError)
 	if !ok {
-		return nil, WithStack(ErrorUniqueIndexType)
+		return nil, ErrorUniqueIndexTypeMismatch
 	}
 	return errs, nil
 }
@@ -27,54 +31,46 @@ func GetIndexName(msg string) (string, error) {
 	exp := regexp.MustCompile(`for key '(.*?)'`)
 	result := exp.FindAllStringSubmatch(msg, 1)
 	if !(len(result) == 1 && len(result[0]) == 2) {
-		return "", WithStack(ErrorUniqueIndexNameEmpty)
+		return "", ErrorUniqueIndexNameEmpty
 	}
 	return result[0][1], nil
 }
 
-func GetFieldValue(model interface{}, fieldName string) (interface{}, error) {
-	modelV := reflect.ValueOf(model)
-	if modelV.Kind() == reflect.Ptr {
-		modelV = modelV.Elem()
-	}
-	field := modelV.FieldByName(fieldName)
-	if !field.IsValid() {
-		return nil, WithStack(ErrorUniqueIndexColumnUnset)
-	}
-	return field.Interface(), nil
-}
-
-func GetUniqueIndexError(model interface{}, error string) error {
-
+func GetUniqueIndexError(model interface{}, uniqueErr error) error {
 	uniqueIndexErrors, err := GetUniqueIndex(model)
 	if err != nil {
-		return err
+		return uniqueErr
 	}
 
 	if len(uniqueIndexErrors) == 0 {
-		return WithStack(ErrorUniqueIndexEmpty)
+		return uniqueErr
 	}
 
-	indexName, err := GetIndexName(error)
+	getIndexNameFull, err := GetIndexName(uniqueErr.Error())
 	if err != nil {
-		return err
+		return uniqueErr
+	}
+	getIndexNameFull = strings.ToLower(getIndexNameFull)
+	getIndexName := getIndexNameFull
+	if i := strings.LastIndex(getIndexNameFull, "."); i != -1 {
+		getIndexName = getIndexNameFull[i+1:]
 	}
 
-	for _, uniqueIndex := range uniqueIndexErrors {
-		indexNameArr := strings.Split(uniqueIndex.IndexName, ".")
-		indexNameWithoutTable := ""
-		if len(indexNameArr) == 2 {
-			indexNameWithoutTable = indexNameArr[1]
+	for _, indexError := range uniqueIndexErrors {
+		indexNameFull := indexError.Index
+		indexNameFull = strings.ToLower(indexNameFull)
+		indexName := indexNameFull
+		if i := strings.LastIndex(indexNameFull, "."); i != -1 {
+			indexName = indexNameFull[i+1:]
 		}
 
-		if uniqueIndex.IndexName == indexName || indexNameWithoutTable == indexName {
-			uniqueIndexErr := uniqueIndex.Error
-			if uniqueIndexErr != nil {
-				return uniqueIndexErr
+		if getIndexNameFull == indexNameFull || getIndexName == indexName {
+			if indexError.Error != nil {
+				return indexError.Error.SetCause(uniqueErr)
 			} else {
-				return WithStack(ErrorUniqueIndexMessageUnset)
+				return uniqueErr
 			}
 		}
 	}
-	return WithStack(ErrorUniqueIndexMisMatch)
+	return uniqueErr
 }

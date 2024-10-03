@@ -66,17 +66,22 @@ func (b *BaseService[T]) NewModel() *T {
 	return new(T)
 }
 
+func (b *BaseService[T]) NewModelList() *[]*T {
+	return new([]*T)
+	//model := b.GetModel()
+	//list := reflect.New(reflect.SliceOf(reflect.TypeOf(model)))
+}
+
 func (b *BaseService[T]) NewModelWithId(id interface{}) (*T, error) {
 	pk, err := b.GetPk()
 	if err != nil {
 		return nil, err
 	}
 	t := new(T)
-	model := reflect.New(reflect.TypeOf(t).Elem())
-	modelV := model.Elem()
+	modelV := reflect.ValueOf(t).Elem()
 	modelFieldV := modelV.FieldByName(pk)
 	modelFieldV.Set(reflect.ValueOf(id).Convert(modelFieldV.Type()))
-	return model.Interface().(*T), nil
+	return t, nil
 }
 
 func (b *BaseService[T]) FindTitle(id interface{}, filters ...map[string]interface{}) (*TitleRes, error) {
@@ -139,56 +144,52 @@ func (b *BaseService[T]) FindOneWithOpts(opts ...Option) (*T, error) {
 }
 
 func (b *BaseService[T]) FindAll(filters ...map[string]interface{}) (*[]*T, error) {
-	model := b.GetModel()
-	list := reflect.New(reflect.SliceOf(reflect.TypeOf(model)))
+	list := b.NewModelList()
 	err := b.DB.FindAll(
-		list.Interface(),
+		list,
 		b.DB.WithFilters(filters...),
 	)
 	if err != nil {
 		return nil, err
 	}
-	return list.Interface().(*[]*T), nil
+	return list, nil
 }
 
 func (b *BaseService[T]) FindAllWithOpts(opts ...Option) (*[]*T, error) {
-	model := b.GetModel()
-	list := reflect.New(reflect.SliceOf(reflect.TypeOf(model)))
+	list := b.NewModelList()
 	err := b.DB.FindAll(
-		list.Interface(),
+		list,
 		opts...,
 	)
 	if err != nil {
 		return nil, err
 	}
-	return list.Interface().(*[]*T), nil
+	return list, nil
 }
 
 func (b *BaseService[T]) FindPage(pageable *Pageable, filters ...map[string]interface{}) (*PageRes[T], error) {
-	model := b.GetModel()
-	list := reflect.New(reflect.SliceOf(reflect.TypeOf(model)))
+	list := b.NewModelList()
 	total, err := b.DB.FindPage(
-		list.Interface(),
+		list,
 		b.DB.WithFilters(filters...),
 		b.DB.WithPageable(pageable),
 	)
 	if err != nil {
 		return nil, err
 	}
-	return &PageRes[T]{Total: total, List: list.Interface().(*[]*T)}, nil
+	return &PageRes[T]{Total: total, List: list}, nil
 }
 
 func (b *BaseService[T]) FindPageWithOpts(opts ...Option) (*PageRes[T], error) {
-	model := b.GetModel()
-	list := reflect.New(reflect.SliceOf(reflect.TypeOf(model)))
+	list := b.NewModelList()
 	total, err := b.DB.FindPage(
-		list.Interface(),
+		list,
 		opts...,
 	)
 	if err != nil {
 		return nil, err
 	}
-	return &PageRes[T]{Total: total, List: list.Interface().(*[]*T)}, nil
+	return &PageRes[T]{Total: total, List: list}, nil
 }
 
 func (b *BaseService[T]) Create(value *T) (*T, error) {

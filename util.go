@@ -91,7 +91,7 @@ func (db *DB) getUpdateValue(model interface{}, value interface{}) (map[string]i
 	valueV := reflect.ValueOf(value)
 	valueT := valueV.Type()
 
-	//value类型必须是struct,map及struct的指针
+	//value类型必须是struct,map或struct的指针
 	if valueV.Kind() == reflect.Ptr {
 		if reflect.ValueOf(value).Elem().Kind() == reflect.Map {
 			return nil, WithStack(ErrorUpdateValuePtrUseMap)
