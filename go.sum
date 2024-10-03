@@ -13,8 +13,8 @@ github.com/go-estar/config v1.0.0 h1:TCTN7EQSsWvHk4/iU2Gi3Y8huUzdNX0d09N0Fz7ysaA
 github.com/go-estar/config v1.0.0/go.mod h1:fB/5i8csMx/LpqkdZ99tw3a79bcd7Ok9LS5MuFh1V78=
 github.com/go-estar/logger v1.0.0 h1:sm1uyo2TF4B+DiO2LZtCyb4VZFgX1VBiKHbTvNySCkI=
 github.com/go-estar/logger v1.0.0/go.mod h1:uBDWGdTOmG3K09SpRFo0jf6HaKwcVt4RllVUn3/GuoA=
-github.com/go-estar/types v1.0.1 h1:zDUUD8AqiCsMMF69TxXlo+Igi6TBpM8XriRJz5hYdoE=
-github.com/go-estar/types v1.0.1/go.mod h1:9z7S6mpFSansfmB4BoULDspqIP6FEohHAR6gdyBhRgo=
+github.com/go-estar/types v1.0.3 h1:IbGJIlcrH7E4m1fsSmRN+AWtWEv7IDEoLNhKlPHg3m4=
+github.com/go-estar/types v1.0.3/go.mod h1:9z7S6mpFSansfmB4BoULDspqIP6FEohHAR6gdyBhRgo=
 github.com/go-sql-driver/mysql v1.7.0/go.mod h1:OXbVy3sEdcQ2Doequ6Z5BW6fXNQTmx+9S1MCJN5yJMI=
 github.com/go-sql-driver/mysql v1.8.1 h1:LedoTUt/eveggdHS9qUFC1EFSa8bU2+1pZjSRpvNJ1Y=
 github.com/go-sql-driver/mysql v1.8.1/go.mod h1:wEBSXgmK//2ZFJyE+qWnIsVGmvmEKlqwuVSjsCm7DZg=
