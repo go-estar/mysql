@@ -2,6 +2,7 @@ package mysql
 
 import (
 	"encoding/json"
+	"errors"
 	"reflect"
 	"time"
 )
@@ -34,19 +35,19 @@ type TitleRes struct {
 	Title string `json:"title"`
 }
 
-type BaseService[T any] struct {
-	DB       *DB
-	GetTitle func(*T) string
-	Pk       string
-	model    *T
+type Service[T any] struct {
+	DB         *DB
+	Pk         string
+	model      *T
+	TitleQuery string
 }
 
-func (b *BaseService[T]) GetPk() (string, error) {
+func (b *Service[T]) GetPk() (string, error) {
 	if b.Pk != "" {
 		return b.Pk, nil
 	}
 	t := b.GetModel()
-	pkField := GetPKField(t)
+	pkField := getPKField(t)
 	pkName := pkField.Name
 	if pkName == "" {
 		return "", WithStack(ErrorPrimaryKeyUnset)
@@ -55,24 +56,24 @@ func (b *BaseService[T]) GetPk() (string, error) {
 	return b.Pk, nil
 }
 
-func (b *BaseService[T]) GetModel() *T {
+func (b *Service[T]) GetModel() *T {
 	if b.model == nil {
 		b.model = b.NewModel()
 	}
 	return b.model
 }
 
-func (b *BaseService[T]) NewModel() *T {
+func (b *Service[T]) NewModel() *T {
 	return new(T)
 }
 
-func (b *BaseService[T]) NewModelList() *[]*T {
+func (b *Service[T]) NewModelList() *[]*T {
 	return new([]*T)
 	//model := b.GetModel()
 	//list := reflect.New(reflect.SliceOf(reflect.TypeOf(model)))
 }
 
-func (b *BaseService[T]) NewModelWithId(id interface{}) (*T, error) {
+func (b *Service[T]) NewModelWithId(id interface{}) (*T, error) {
 	pk, err := b.GetPk()
 	if err != nil {
 		return nil, err
@@ -84,30 +85,29 @@ func (b *BaseService[T]) NewModelWithId(id interface{}) (*T, error) {
 	return t, nil
 }
 
-func (b *BaseService[T]) FindTitle(id interface{}, filters ...map[string]interface{}) (*TitleRes, error) {
-	model, err := b.FindById(id, filters...)
-	if err != nil {
-		return nil, err
+func (b *Service[T]) FindTitle(id interface{}, opts ...Option) (*TitleRes, error) {
+	if b.TitleQuery == "" {
+		return nil, errors.New("TitleQuery not configured")
 	}
-	return &TitleRes{Title: b.GetTitle(model)}, nil
-}
-
-func (b *BaseService[T]) FindById(id interface{}, filters ...map[string]interface{}) (*T, error) {
 	model, err := b.NewModelWithId(id)
 	if err != nil {
 		return nil, err
 	}
+	title := &TitleRes{}
 	if err := b.DB.FindById(
 		model,
-		b.DB.WithFilters(filters...),
+		append(
+			opts,
+			WithSelect(b.TitleQuery+" as title"),
+			WithDest(title),
+		)...
 	); err != nil {
 		return nil, err
 	}
-	return model, nil
+	return title, nil
 }
 
-
-func (b *BaseService[T]) FindByIdWithOpts(id interface{}, opts ...Option) (*T, error) {
+func (b *Service[T]) FindById(id interface{}, opts ...Option) (*T, error) {
 	model, err := b.NewModelWithId(id)
 	if err != nil {
 		return nil, err
@@ -121,18 +121,7 @@ func (b *BaseService[T]) FindByIdWithOpts(id interface{}, opts ...Option) (*T, e
 	return model, nil
 }
 
-func (b *BaseService[T]) FindOne(filters ...map[string]interface{}) (*T, error) {
-	model := b.NewModel()
-	if err := b.DB.FindOne(
-		model,
-		b.DB.WithFilters(filters...),
-	); err != nil {
-		return nil, err
-	}
-	return model, nil
-}
-
-func (b *BaseService[T]) FindOneWithOpts(opts ...Option) (*T, error) {
+func (b *Service[T]) FindOne(opts ...Option) (*T, error) {
 	model := b.NewModel()
 	if err := b.DB.FindOne(
 		model,
@@ -143,19 +132,8 @@ func (b *BaseService[T]) FindOneWithOpts(opts ...Option) (*T, error) {
 	return model, nil
 }
 
-func (b *BaseService[T]) FindAll(filters ...map[string]interface{}) (*[]*T, error) {
-	list := b.NewModelList()
-	err := b.DB.FindAll(
-		list,
-		b.DB.WithFilters(filters...),
-	)
-	if err != nil {
-		return nil, err
-	}
-	return list, nil
-}
 
-func (b *BaseService[T]) FindAllWithOpts(opts ...Option) (*[]*T, error) {
+func (b *Service[T]) FindAll(opts ...Option) (*[]*T, error) {
 	list := b.NewModelList()
 	err := b.DB.FindAll(
 		list,
@@ -167,20 +145,7 @@ func (b *BaseService[T]) FindAllWithOpts(opts ...Option) (*[]*T, error) {
 	return list, nil
 }
 
-func (b *BaseService[T]) FindPage(pageable *Pageable, filters ...map[string]interface{}) (*PageRes[T], error) {
-	list := b.NewModelList()
-	total, err := b.DB.FindPage(
-		list,
-		b.DB.WithFilters(filters...),
-		b.DB.WithPageable(pageable),
-	)
-	if err != nil {
-		return nil, err
-	}
-	return &PageRes[T]{Total: total, List: list}, nil
-}
-
-func (b *BaseService[T]) FindPageWithOpts(opts ...Option) (*PageRes[T], error) {
+func (b *Service[T]) FindPage(opts ...Option) (*PageRes[T], error) {
 	list := b.NewModelList()
 	total, err := b.DB.FindPage(
 		list,
@@ -192,71 +157,57 @@ func (b *BaseService[T]) FindPageWithOpts(opts ...Option) (*PageRes[T], error) {
 	return &PageRes[T]{Total: total, List: list}, nil
 }
 
-func (b *BaseService[T]) Create(value *T) (*T, error) {
+func (b *Service[T]) Create(value *T) (*T, error) {
 	err := b.DB.Create(value)
 	return value, err
 }
 
-func (b *BaseService[T]) CreateWithUserId(value *T, userId int) (*T, error) {
+func (b *Service[T]) CreateWithUserId(value *T, userId int) (*T, error) {
 	SetCreatedBy(value, userId)
 	return b.Create(value)
 }
 
-func (b *BaseService[T]) Update(value *T, filters ...map[string]interface{}) (*T, error) {
+func (b *Service[T]) Update(value *T, opts ...Option) (*T, error) {
 	if err := b.DB.UpdateById(
 		value,
 		value,
-		b.DB.WithOmit("createdAt", "createdBy"),
-		b.DB.WithFilters(filters...),
-	); err != nil {
-		return nil, err
-	}
-
-	if err := b.DB.FindById(
-		value,
+		opts...,
 	); err != nil {
 		return nil, err
 	}
 	return value, nil
 }
 
-func (b *BaseService[T]) UpdateWithUserId(value *T, userId int, filters ...map[string]interface{}) (*T, error) {
+func (b *Service[T]) UpdateWithUserId(value *T, userId int, opts ...Option) (*T, error) {
 	SetUpdatedBy(value, userId)
-	return b.Update(value, filters...)
+	return b.Update(value, opts...)
 }
 
-func (b *BaseService[T]) UpdateById(id interface{}, value interface{}, filters ...map[string]interface{}) (*T, error) {
+func (b *Service[T]) UpdateById(id interface{}, value interface{}, opts ...Option) (error) {
 	model, err := b.NewModelWithId(id)
 	if err != nil {
-		return nil, err
+		return  err
 	}
 	if err := b.DB.UpdateById(
 		model,
 		value,
-		b.DB.WithOmit("createdAt", "createdBy"),
-		b.DB.WithFilters(filters...),
+		opts...,
 	); err != nil {
-		return nil, err
+		return  err
 	}
-	if err := b.DB.FindById(
-		model,
-	); err != nil {
-		return nil, err
-	}
-	return model, err
+	return nil
 }
 
-func (b *BaseService[T]) UpdateByIdWithUserId(id interface{}, value interface{}, userId int, filters ...map[string]interface{}) (*T, error) {
+func (b *Service[T]) UpdateByIdWithUserId(id interface{}, value interface{}, userId int, opts ...Option) ( error) {
 	SetUpdatedBy(value, userId)
-	return b.UpdateById(id, value, filters...)
+	return b.UpdateById(id, value, opts...)
 }
 
-func (b *BaseService[T]) UpdateOneOrCreate(value *T, filters ...map[string]interface{}) (*T, error) {
+func (b *Service[T]) UpdateOneOrCreate(value *T, opts ...Option) (*T, error) {
 	if err := b.DB.UpdateOne(
 		value,
 		value,
-		b.DB.WithOmit("createdAt", "createdBy"),
-		b.DB.WithFilters(filters...),
+		opts...,
 	); err != nil {
 		if IsRecordNotFoundError(err) {
 			return b.Create(value)
@@ -266,13 +217,12 @@ func (b *BaseService[T]) UpdateOneOrCreate(value *T, filters ...map[string]inter
 	return value, nil
 }
 
-func (b *BaseService[T]) UpdateOneOrCreateWithUserId(value *T, userId int, filters ...map[string]interface{}) (*T, error) {
+func (b *Service[T]) UpdateOneOrCreateWithUserId(value *T, userId int, opts ...Option) (*T, error) {
 	SetUpdatedBy(value, userId)
 	if err := b.DB.UpdateOne(
 		value,
 		value,
-		b.DB.WithOmit("createdAt", "createdBy"),
-		b.DB.WithFilters(filters...),
+		opts...,
 	); err != nil {
 		if IsRecordNotFoundError(err) {
 			SetCreatedBy(value, userId)
@@ -283,36 +233,35 @@ func (b *BaseService[T]) UpdateOneOrCreateWithUserId(value *T, userId int, filte
 	return value, nil
 }
 
-func (b *BaseService[T]) Remove(value *T, filters ...map[string]interface{}) error {
+func (b *Service[T]) Remove(value *T, opts ...Option) error {
 	SetDeleted(value)
 	return b.DB.UpdateById(
 		value,
 		value,
-		b.DB.WithAttend("updatedAt", "updatedBy", "deleted"),
-		b.DB.WithFilters(filters...),
+		append(opts,WithAttend("updatedAt", "updatedBy", "deleted"))...
 	)
 }
 
-func (b *BaseService[T]) RemoveWithUserId(value *T, userId int, filters ...map[string]interface{}) error {
+func (b *Service[T]) RemoveWithUserId(value *T, userId int, opts ...Option) error {
 	SetUpdatedBy(value, userId)
-	return b.Remove(value, filters...)
+	return b.Remove(value, opts...)
 }
 
-func (b *BaseService[T]) RemoveById(id interface{}, filters ...map[string]interface{}) error {
+func (b *Service[T]) RemoveById(id interface{}, opts ...Option) error {
 	model, err := b.NewModelWithId(id)
 	if err != nil {
 		return err
 	}
-	return b.Remove(model, filters...)
+	return b.Remove(model, opts...)
 }
 
-func (b *BaseService[T]) RemoveByIdWithUserId(id interface{}, userId int, filters ...map[string]interface{}) error {
+func (b *Service[T]) RemoveByIdWithUserId(id interface{}, userId int, opts ...Option) error {
 	model, err := b.NewModelWithId(id)
 	if err != nil {
 		return err
 	}
 	SetUpdatedBy(model, userId)
-	return b.Remove(model, filters...)
+	return b.Remove(model, opts...)
 }
 
 func SetCreatedBy(value interface{}, userId int) {

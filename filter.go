@@ -19,6 +19,7 @@ const (
 	SymbolNotLike           = "notLike"
 	SymbolIn                = "in"
 	SymbolNotIn             = "notIn"
+	SymbolFunc              = "func"
 )
 
 var Symbol = map[string]string{
@@ -37,10 +38,10 @@ var Symbol = map[string]string{
 type FilterKey struct {
 	Column          string
 	Operator        string
-	IgnoreZeroValue bool
+	IgnoreZeroValue bool // Prefix"?"
 }
 
-func KeyFormat(key string) *FilterKey {
+func keyFormat(key string) *FilterKey {
 	var filterKey FilterKey
 
 	if strings.HasPrefix(key, "?") {
@@ -63,51 +64,50 @@ func KeyFormat(key string) *FilterKey {
 	return &filterKey
 }
 
-func (db *DB) Filters(query *gorm.DB, filters map[string]interface{}) *gorm.DB {
-
-	var wheres [][]interface{}
+func Filters(query *gorm.DB, filters map[string]interface{}) *gorm.DB {
 	for key, val := range filters {
 		if val == nil {
 			continue
 		}
 
-		filterKey := KeyFormat(key)
+		filterKey := keyFormat(key)
 		if filterKey.IgnoreZeroValue && fieldUtil.IsEmpty(val) {
 			continue
 		}
 
 		switch filterKey.Operator {
 		case SymbolEquals:
-			wheres = append(wheres, []interface{}{filterKey.Column + " = ?", val})
+			query = query.Where(filterKey.Column + " = ?", val)
 		case SymbolNotEquals:
-			wheres = append(wheres, []interface{}{filterKey.Column + " != ?", val})
+			query = query.Where(filterKey.Column + " != ?", val)
 		case SymbolGreatThanOrEquals:
-			wheres = append(wheres, []interface{}{filterKey.Column + " >= ?", val})
+			query = query.Where(filterKey.Column + " >= ?", val)
 		case SymbolGreatThan:
-			wheres = append(wheres, []interface{}{filterKey.Column + " > ?", val})
+			query = query.Where(filterKey.Column + " > ?", val)
 		case SymbolLessThanOrEquals:
-			wheres = append(wheres, []interface{}{filterKey.Column + " <= ?", val})
+			query = query.Where(filterKey.Column + " <= ?", val)
 		case SymbolLessThan:
-			wheres = append(wheres, []interface{}{filterKey.Column + " < ?", val})
+			query = query.Where(filterKey.Column + " < ?", val)
 		case SymbolLike:
-			wheres = append(wheres, []interface{}{filterKey.Column + " like ?", fmt.Sprintf("%%%s%%", val)})
+			query = query.Where(filterKey.Column + " like ?", fmt.Sprintf("%%%s%%", val))
 		case SymbolNotLike:
-			wheres = append(wheres, []interface{}{filterKey.Column + " not like ?", fmt.Sprintf("%%%s%%", val)})
+			query = query.Where(filterKey.Column + " not like ?", fmt.Sprintf("%%%s%%", val))
 		case SymbolIn:
-			wheres = append(wheres, []interface{}{filterKey.Column + " in (?)", val})
+			query = query.Where(filterKey.Column + " in (?)", val)
 		case SymbolNotIn:
-			wheres = append(wheres, []interface{}{filterKey.Column + " not in (?)", val})
+			query = query.Where(filterKey.Column + " not in (?)", val)
+		case SymbolFunc:
+			fn, ok := val.(func(db2 *gorm.DB))
+			if ok {
+				fn(query)
+			}
 		default:
 			if reflect.ValueOf(val).Kind() == reflect.Slice {
-				wheres = append(wheres, []interface{}{filterKey.Column + " in (?)", val})
+				query = query.Where(filterKey.Column + " in (?)", val)
 			} else {
-				wheres = append(wheres, []interface{}{filterKey.Column + " = ?", val})
+				query = query.Where(filterKey.Column + " = ?", val)
 			}
 		}
-	}
-
-	for _, where := range wheres {
-		query = query.Where(where[0], where[1:]...)
 	}
 	return query
 }

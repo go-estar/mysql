@@ -16,7 +16,7 @@ func NewUniqueIndexError(index string, err *baseError.Error) *UniqueIndexError {
 }
 
 func GetUniqueIndex(model interface{}) ([]*UniqueIndexError, error) {
-	result, err := ModelMethod(model, "UniqueIndexErrors")
+	result, err := modelMethod(model, "UniqueIndexErrors")
 	if err != nil {
 		return nil, ErrorUniqueIndexUnset
 	}

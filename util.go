@@ -5,9 +5,19 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+	"gorm.io/gorm"
 )
 
-func (db *DB) structToMap(obj interface{}) map[string]interface{} {
+func isStruct(value interface{}) bool {
+	v := reflect.ValueOf(value)
+	if v.Kind() == reflect.Ptr {
+		return reflect.ValueOf(value).Elem().Kind() == reflect.Struct
+	} else {
+		return v.Kind() == reflect.Struct
+	}
+}
+
+func structToMap(c *gorm.Config,obj interface{}) map[string]interface{} {
 	m := make(map[string]interface{})
 	if obj == nil {
 		return m
@@ -29,9 +39,9 @@ func (db *DB) structToMap(obj interface{}) map[string]interface{} {
 
 	for _, key := range keys {
 		fieldV := v.FieldByName(key)
-		name := db.Config.NamingStrategy.ColumnName("", key)
+		name := c.NamingStrategy.ColumnName("", key)
 		if fieldT, ok := t.FieldByName(key); ok {
-			name = db.getColumnName(fieldT)
+			name = getColumnName(c,fieldT)
 		}
 		if fieldV.Kind() == reflect.Ptr && !fieldV.IsNil() {
 			fieldV = fieldV.Elem()
@@ -41,7 +51,7 @@ func (db *DB) structToMap(obj interface{}) map[string]interface{} {
 	return m
 }
 
-func (db *DB) checkUpdateField(valueField reflect.Value, fieldName string, modelV reflect.Value, primaryKey string) error {
+func checkUpdateField(valueField reflect.Value, fieldName string, modelV reflect.Value, primaryKey string) error {
 	fieldType := valueField.Type().String()
 	debugInfo := fmt.Sprintf("%s[%s]:%v", fieldName, fieldType, valueField.Interface())
 	if strings.ToLower(primaryKey) == strings.ToLower(fieldName) {
@@ -71,7 +81,7 @@ func (db *DB) checkUpdateField(valueField reflect.Value, fieldName string, model
 		modelField = modelField.Elem()
 	}
 
-	if modelField.Interface() == valueField.Interface() {
+	if modelField.Comparable() && modelField.Interface() == valueField.Interface() {
 		return stderrors.New(debugInfo + "!!!skip same interface value")
 	}
 	if fmt.Sprintf("%v", modelField) == fmt.Sprintf("%v", valueField) {
@@ -80,7 +90,7 @@ func (db *DB) checkUpdateField(valueField reflect.Value, fieldName string, model
 	return nil
 }
 
-func (db *DB) getUpdateValue(model interface{}, value interface{}) (map[string]interface{}, error) {
+func getUpdateValue(c *gorm.Config,model interface{}, value interface{}) (map[string]interface{}, error) {
 
 	var m = map[string]interface{}{}
 
@@ -113,7 +123,7 @@ func (db *DB) getUpdateValue(model interface{}, value interface{}) (map[string]i
 	if modelT.Kind() == reflect.Ptr {
 		modelT = modelT.Elem()
 	}
-	primaryKey := db.getPKName(model)
+	primaryKey := getPKName(c,model)
 
 	//如果是struct则转换为map
 	//移除值与数据库值相同的字段
@@ -121,12 +131,12 @@ func (db *DB) getUpdateValue(model interface{}, value interface{}) (map[string]i
 	if valueV.Kind() == reflect.Map {
 		for _, mapKey := range valueV.MapKeys() {
 			valueField := valueV.MapIndex(mapKey)
-			fieldName := db.Config.NamingStrategy.SchemaName(mapKey.Interface().(string))
+			fieldName := c.NamingStrategy.SchemaName(mapKey.Interface().(string))
 			modelField, found := modelT.FieldByName(fieldName)
 			if found && modelField.Tag.Get("gorm") == "-" {
 				continue
 			}
-			if err := db.checkUpdateField(valueField, fieldName, modelV, primaryKey); err != nil {
+			if err := checkUpdateField(valueField, fieldName, modelV, primaryKey); err != nil {
 				//fmt.Println(err)
 				continue
 			}
@@ -140,7 +150,7 @@ func (db *DB) getUpdateValue(model interface{}, value interface{}) (map[string]i
 			if found && modelField.Tag.Get("gorm") == "-" {
 				continue
 			}
-			if err := db.checkUpdateField(valueField, fieldName, modelV, primaryKey); err != nil {
+			if err := checkUpdateField(valueField, fieldName, modelV, primaryKey); err != nil {
 				//fmt.Println(err)
 				continue
 			}
@@ -151,12 +161,30 @@ func (db *DB) getUpdateValue(model interface{}, value interface{}) (map[string]i
 	return m, nil
 }
 
+func getColumnName(c *gorm.Config,field reflect.StructField) string {
+	tag := field.Tag.Get("gorm")
+	if tag == "" {
+		return c.NamingStrategy.ColumnName("", field.Name)
+	}
+	arr := strings.Split(tag, ",")
+	for _, str := range arr {
+		if strings.HasPrefix(str, "column:") {
+			return strings.Replace(str, "column:", "", 1)
+		}
+	}
+	return c.NamingStrategy.ColumnName("", field.Name)
+}
+
+func getPKName(c *gorm.Config,model interface{}) string {
+	return getColumnName(c,getPKField(model))
+}
+
 type PK struct {
 	Name  string
 	Value interface{}
 }
 
-func (db *DB) validatePK(model interface{}, primaryKey ...string) (*PK, error) {
+func validatePK(model interface{}, primaryKey ...string) (*PK, error) {
 	modelV := reflect.ValueOf(model)
 	if modelV.Kind() == reflect.Ptr {
 		modelV = modelV.Elem()
@@ -166,7 +194,7 @@ func (db *DB) validatePK(model interface{}, primaryKey ...string) (*PK, error) {
 	if len(primaryKey) > 0 && primaryKey[0] != "" {
 		pkName = primaryKey[0]
 	} else {
-		pkField := GetPKField(model)
+		pkField := getPKField(model)
 		if pkField.Name == "" {
 			return nil, WithStack(ErrorPrimaryKeyUnset)
 		}
@@ -187,7 +215,7 @@ func (db *DB) validatePK(model interface{}, primaryKey ...string) (*PK, error) {
 	}, nil
 }
 
-func (db *DB) setPKValue(model interface{}, pkFieldName string, value interface{}) error {
+func setPKValue(model interface{}, pkFieldName string, value interface{}) error {
 	modelV := reflect.ValueOf(model)
 	if modelV.Kind() == reflect.Ptr {
 		modelV = modelV.Elem()
@@ -201,25 +229,7 @@ func (db *DB) setPKValue(model interface{}, pkFieldName string, value interface{
 	return nil
 }
 
-func (db *DB) getColumnName(field reflect.StructField) string {
-	tag := field.Tag.Get("gorm")
-	if tag == "" {
-		return db.Config.NamingStrategy.ColumnName("", field.Name)
-	}
-	arr := strings.Split(tag, ",")
-	for _, str := range arr {
-		if strings.HasPrefix(str, "column:") {
-			return strings.Replace(str, "column:", "", 1)
-		}
-	}
-	return db.Config.NamingStrategy.ColumnName("", field.Name)
-}
-
-func (db *DB) getPKName(model interface{}) string {
-	return db.getColumnName(GetPKField(model))
-}
-
-func GetPKField(model interface{}) reflect.StructField {
+func getPKField(model interface{}) reflect.StructField {
 	modelT := reflect.TypeOf(model)
 	if modelT.Kind() == reflect.Ptr {
 		modelT = modelT.Elem()
@@ -234,7 +244,7 @@ func GetPKField(model interface{}) reflect.StructField {
 	return reflect.StructField{}
 }
 
-func ModelMethod(model interface{}, methodName string) (r interface{}, err error) {
+func modelMethod(model interface{}, methodName string) (r interface{}, err error) {
 	defer func() {
 		if e := recover(); e != nil {
 			err = stderrors.New(fmt.Sprint(e))
@@ -250,8 +260,8 @@ func ModelMethod(model interface{}, methodName string) (r interface{}, err error
 	return result[0].Interface(), nil
 }
 
-func GetRecordNotFoundError(model interface{}) error {
-	result, err := ModelMethod(model, "RecordNotFoundError")
+func getRecordNotFoundError(model interface{}) error {
+	result, err := modelMethod(model, "RecordNotFoundError")
 	if err != nil {
 		return WithStack(ErrorRecordNotFound)
 	}
@@ -262,8 +272,8 @@ func GetRecordNotFoundError(model interface{}) error {
 	return e
 }
 
-func GetRecordNotAffectedError(model interface{}) error {
-	result, err := ModelMethod(model, "NoRecordAffectedError")
+func getRecordNotAffectedError(model interface{}) error {
+	result, err := modelMethod(model, "NoRecordAffectedError")
 	if err != nil {
 		return WithStack(ErrorRecordNotAffected)
 	}
@@ -274,8 +284,8 @@ func GetRecordNotAffectedError(model interface{}) error {
 	return e
 }
 
-func GetTableName(model interface{}) string {
-	result, err := ModelMethod(model, "TableName")
+func getTableName(model interface{}) string {
+	result, err := modelMethod(model, "TableName")
 	if err != nil {
 		return ""
 	}

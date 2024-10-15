@@ -1,7 +1,6 @@
 package mysql
 
 import (
-	"github.com/jinzhu/copier"
 	"gorm.io/gorm"
 	"reflect"
 )
@@ -15,7 +14,7 @@ func (db *DB) Create(model interface{}, opts ...Option) error {
 	if reflect.TypeOf(model).Kind() != reflect.Ptr || reflect.TypeOf(model).Elem().Kind() != reflect.Struct {
 		return WithStack(ErrorModel)
 	}
-	query, _ := db.QueryBuilder(model, opts...)
+	query, _ := db.queryBuilder(model, opts...)
 	if err := query.Create(model).Error; err != nil {
 		if db.IsUniqueIndexError(err) {
 			return GetUniqueIndexError(model, err)
@@ -29,9 +28,9 @@ func (db *DB) Count(model interface{}, opts ...Option) (int, error) {
 	if reflect.TypeOf(model).Kind() != reflect.Ptr || reflect.TypeOf(model).Elem().Kind() != reflect.Struct {
 		return 0, WithStack(ErrorModel)
 	}
-	query, _ := db.QueryBuilder(model, opts...)
+	query, _ := db.queryBuilder(model, opts...)
 	var count int64 = 0
-	if err := db.CountBuilder(query).Count(&count).Error; err != nil {
+	if err := countBuilder(query).Count(&count).Error; err != nil {
 		return 0, WithStack(err)
 	}
 	return int(count), nil
@@ -42,13 +41,17 @@ func (db *DB) FindById(model interface{}, opts ...Option) error {
 		return WithStack(ErrorModel)
 	}
 
-	query, queryOpt := db.QueryBuilder(model, opts...)
+	query, queryOpt := db.queryBuilder(model, opts...)
 
-	if _, err := db.validatePK(model, queryOpt.PrimaryKey); err != nil {
+	if _, err := validatePK(model, queryOpt.PrimaryKey); err != nil {
 		return err
 	}
 
-	if err := query.Take(model).Error; err != nil {
+	var dest = model
+	if queryOpt.Dest != nil {
+		dest = queryOpt.Dest
+	}
+	if err := query.Take(dest).Error; err != nil {
 		if db.IsRecordNotFoundError(err) {
 			if queryOpt.IgnoreNotFound {
 				return nil
@@ -56,7 +59,7 @@ func (db *DB) FindById(model interface{}, opts ...Option) error {
 				if err := queryOpt.ErrorNotFound; err != nil {
 					return err
 				}
-				return GetRecordNotFoundError(model)
+				return getRecordNotFoundError(model)
 			}
 		} else {
 			return WithStack(err)
@@ -70,9 +73,13 @@ func (db *DB) FindOne(model interface{}, opts ...Option) error {
 		return WithStack(ErrorModel)
 	}
 
-	query, queryOpt := db.QueryBuilder(model, opts...)
+	query, queryOpt := db.queryBuilder(model, opts...)
 
-	list := reflect.New(reflect.SliceOf(reflect.TypeOf(model).Elem()))
+	var dest = model
+	if queryOpt.Dest != nil {
+		dest = queryOpt.Dest
+	}
+	list := reflect.New(reflect.SliceOf(reflect.TypeOf(dest).Elem()))
 	if err := query.Find(list.Interface()).Error; err != nil {
 		return WithStack(err)
 	}
@@ -85,7 +92,7 @@ func (db *DB) FindOne(model interface{}, opts ...Option) error {
 			if err := queryOpt.ErrorNotFound; err != nil {
 				return err
 			}
-			return GetRecordNotFoundError(model)
+			return getRecordNotFoundError(model)
 		}
 	}
 	if count > 1 {
@@ -104,14 +111,14 @@ func (db *DB) CloneById(model interface{}, opts ...Option) (interface{}, error) 
 		return nil, WithStack(ErrorModel)
 	}
 	clone := reflect.New(reflect.TypeOf(model).Elem()).Interface()
-
-	pk, err := db.validatePK(model)
+	pk, err := validatePK(model)
 	if err != nil {
 		return nil, err
 	}
-	if err := db.setPKValue(clone, pk.Name, pk.Value); err != nil {
+	if err := setPKValue(clone, pk.Name, pk.Value); err != nil {
 		return nil, err
 	}
+	opts = append(opts,WithIgnoreOmit())
 	if err := db.FindById(clone, opts...); err != nil {
 		return nil, err
 	}
@@ -123,9 +130,7 @@ func (db *DB) CloneOne(model interface{}, opts ...Option) (interface{}, error) {
 		return nil, WithStack(ErrorModel)
 	}
 	clone := reflect.New(reflect.TypeOf(model).Elem()).Interface()
-	if err := copier.Copy(clone, model); err != nil {
-		return nil, err
-	}
+	opts = append(opts,WithIgnoreOmit())
 	if err := db.FindOne(clone, opts...); err != nil {
 		return nil, err
 	}
@@ -141,7 +146,7 @@ func (db *DB) delete(model interface{}, query *gorm.DB, queryOpt *QueryOption) e
 		if err := queryOpt.ErrorNotAffected; err != nil {
 			return err
 		}
-		return GetRecordNotAffectedError(model)
+		return getRecordNotAffectedError(model)
 	}
 	return nil
 }
@@ -150,7 +155,7 @@ func (db *DB) DeleteAll(model interface{}, opts ...Option) error {
 	if reflect.TypeOf(model).Kind() != reflect.Ptr || reflect.TypeOf(model).Elem().Kind() != reflect.Struct {
 		return WithStack(ErrorModel)
 	}
-	query, queryOpt := db.QueryBuilder(model, opts...)
+	query, queryOpt := db.queryBuilder(model, opts...)
 	return db.delete(model, query, queryOpt)
 }
 
@@ -158,8 +163,8 @@ func (db *DB) DeleteById(model interface{}, opts ...Option) error {
 	if reflect.TypeOf(model).Kind() != reflect.Ptr || reflect.TypeOf(model).Elem().Kind() != reflect.Struct {
 		return WithStack(ErrorModel)
 	}
-	query, queryOpt := db.QueryBuilder(model, opts...)
-	if _, err := db.validatePK(model, queryOpt.PrimaryKey); err != nil {
+	query, queryOpt := db.queryBuilder(model, opts...)
+	if _, err := validatePK(model, queryOpt.PrimaryKey); err != nil {
 		return err
 	}
 	return db.delete(model, query, queryOpt)
@@ -169,8 +174,12 @@ func (db *DB) DeleteOne(model interface{}, opts ...Option) error {
 	if reflect.TypeOf(model).Kind() != reflect.Ptr || reflect.TypeOf(model).Elem().Kind() != reflect.Struct {
 		return WithStack(ErrorModel)
 	}
-	query, queryOpt := db.QueryBuilder(model, opts...)
-	list := reflect.New(reflect.SliceOf(reflect.TypeOf(model).Elem()))
+	query, queryOpt := db.queryBuilder(model, opts...)
+	var dest = model
+	if queryOpt.Dest != nil {
+		dest = queryOpt.Dest
+	}
+	list := reflect.New(reflect.SliceOf(reflect.TypeOf(dest).Elem()))
 	if err := query.Find(list.Interface()).Error; err != nil {
 		return WithStack(err)
 	}
@@ -182,7 +191,7 @@ func (db *DB) DeleteOne(model interface{}, opts ...Option) error {
 			if err := queryOpt.ErrorNotFound; err != nil {
 				return err
 			}
-			return GetRecordNotFoundError(model)
+			return getRecordNotFoundError(model)
 		}
 	}
 	if count > 1 {
@@ -218,7 +227,7 @@ func (db *DB) update(model interface{}, updates interface{}, query *gorm.DB, que
 		if err := queryOpt.ErrorNotAffected; err != nil {
 			return 0, err
 		}
-		return 0, GetRecordNotAffectedError(model)
+		return 0, getRecordNotAffectedError(model)
 	}
 	return int(query.RowsAffected), nil
 }
@@ -227,7 +236,7 @@ func (db *DB) UpdateAll(model interface{}, updates interface{}, opts ...Option) 
 	if reflect.TypeOf(model).Kind() != reflect.Ptr || reflect.TypeOf(model).Elem().Kind() != reflect.Struct {
 		return 0, WithStack(ErrorModel)
 	}
-	query, queryOpt := db.QueryBuilder(model, opts...)
+	query, queryOpt := db.queryBuilder(model, opts...)
 	return db.update(model, updates, query, queryOpt)
 }
 
@@ -235,12 +244,12 @@ func (db *DB) UpdateById(model interface{}, values interface{}, opts ...Option) 
 	if reflect.TypeOf(model).Kind() != reflect.Ptr || reflect.TypeOf(model).Elem().Kind() != reflect.Struct {
 		return WithStack(ErrorModel)
 	}
-	if db.isStruct(values) {
+	if isStruct(values) {
 		_, err := db.UpdateByIdWithChangedValues(model, values, opts...)
 		return err
 	}
-	query, queryOpt := db.QueryBuilder(model, opts...)
-	if _, err := db.validatePK(model, queryOpt.PrimaryKey); err != nil {
+	query, queryOpt := db.queryBuilder(model, opts...)
+	if _, err := validatePK(model, queryOpt.PrimaryKey); err != nil {
 		return err
 	}
 	_, err := db.update(model, values, query, queryOpt)
@@ -258,7 +267,7 @@ func (db *DB) UpdateByIdWithChangedValues(model interface{}, values interface{},
 	if clone == nil {
 		return nil, nil
 	}
-	updates, err := db.getUpdateValue(clone, values)
+	updates, err := getUpdateValue(db.Config, clone, values)
 	if err != nil {
 		return nil, err
 	}
@@ -273,11 +282,11 @@ func (db *DB) UpdateOne(model interface{}, values interface{}, opts ...Option) e
 	if reflect.TypeOf(model).Kind() != reflect.Ptr || reflect.TypeOf(model).Elem().Kind() != reflect.Struct {
 		return WithStack(ErrorModel)
 	}
-	if db.isStruct(values) {
+	if isStruct(values) {
 		_, err := db.UpdateOneWithChangedValues(model, values, opts...)
 		return err
 	}
-	query, queryOpt := db.QueryBuilder(model, opts...)
+	query, queryOpt := db.queryBuilder(model, opts...)
 	list := reflect.New(reflect.SliceOf(reflect.TypeOf(model).Elem()))
 	if err := query.Find(list.Interface()).Error; err != nil {
 		return WithStack(err)
@@ -290,7 +299,7 @@ func (db *DB) UpdateOne(model interface{}, values interface{}, opts ...Option) e
 			if err := queryOpt.ErrorNotFound; err != nil {
 				return err
 			}
-			return GetRecordNotFoundError(model)
+			return getRecordNotFoundError(model)
 		}
 	}
 	if count > 1 {
@@ -314,7 +323,7 @@ func (db *DB) UpdateOneWithChangedValues(model interface{}, values interface{}, 
 	if clone == nil {
 		return nil, nil
 	}
-	updates, err := db.getUpdateValue(clone, values)
+	updates, err := getUpdateValue(db.Config, clone, values)
 	if err != nil {
 		return nil, err
 	}
@@ -340,14 +349,18 @@ func (db *DB) Find(model interface{}, opts ...Option) error {
 	if reflect.TypeOf(model).Kind() != reflect.Ptr || reflect.TypeOf(model).Elem().Kind() != reflect.Struct {
 		return WithStack(ErrorModel)
 	}
-	query, queryOpt := db.QueryBuilder(model, opts...)
+	query, queryOpt := db.queryBuilder(model, opts...)
 
+	var dest = model
+	if queryOpt.Dest != nil {
+		dest = queryOpt.Dest
+	}
 	if queryOpt.First {
-		query.First(model)
+		query.First(dest)
 	} else if queryOpt.Last {
-		query.Last(model)
+		query.Last(dest)
 	} else {
-		query.Find(model)
+		query.Find(dest)
 	}
 
 	if err := query.Error; err != nil {
@@ -358,7 +371,7 @@ func (db *DB) Find(model interface{}, opts ...Option) error {
 				if err := queryOpt.ErrorNotFound; err != nil {
 					return err
 				}
-				return GetRecordNotFoundError(model)
+				return getRecordNotFoundError(model)
 			}
 		} else {
 			return WithStack(err)
@@ -371,35 +384,41 @@ func (db *DB) FindAllWithModel(model interface{}, opts ...Option) (interface{}, 
 	if reflect.TypeOf(model).Kind() != reflect.Ptr || reflect.TypeOf(model).Elem().Kind() != reflect.Struct {
 		return nil, WithStack(ErrorModel)
 	}
-	query, queryOpt := db.QueryBuilder(model, opts...)
-	query = db.DefaultSort(model, query, queryOpt)
-
-	list := reflect.New(reflect.SliceOf(reflect.TypeOf(model).Elem()))
+	query, queryOpt := db.queryBuilder(model, opts...)
+	query = defaultSort(model, query, queryOpt)
+	var dest = model
+	if queryOpt.Dest != nil {
+		dest = queryOpt.Dest
+	}
+	list := reflect.New(reflect.SliceOf(reflect.TypeOf(dest)))
 	if err := query.Find(list.Interface()).Error; err != nil {
 		return nil, WithStack(err)
 	}
-	return list.Elem().Interface(), nil
+	return list.Interface(), nil
 }
 
 func (db *DB) FindPageWithModel(model interface{}, opts ...Option) (interface{}, int, error) {
 	if reflect.TypeOf(model).Kind() != reflect.Ptr || reflect.TypeOf(model).Elem().Kind() != reflect.Struct {
 		return nil, 0, WithStack(ErrorModel)
 	}
-	query, queryOpt := db.QueryBuilder(model, opts...)
-	query = db.DefaultSort(model, query, queryOpt)
-
-	list := reflect.New(reflect.SliceOf(reflect.TypeOf(model).Elem()))
+	query, queryOpt := db.queryBuilder(model, opts...)
+	query = defaultSort(model, query, queryOpt)
+	var dest = model
+	if queryOpt.Dest != nil {
+		dest = queryOpt.Dest
+	}
+	list := reflect.New(reflect.SliceOf(reflect.TypeOf(dest)))
 	if err := query.Find(list.Interface()).Error; err != nil {
 		return nil, 0, WithStack(err)
 	}
 
 	var total int64 = 0
 	if queryOpt.Pageable != nil {
-		if err := db.CountBuilder(query).Count(&total).Error; err != nil {
+		if err := countBuilder(query).Count(&total).Error; err != nil {
 			return nil, 0, err
 		}
 	}
-	return list.Elem().Interface(), int(total), nil
+	return list.Interface(), int(total), nil
 }
 
 func (db *DB) FindAll(list interface{}, opts ...Option) error {
@@ -417,14 +436,13 @@ func (db *DB) FindAll(list interface{}, opts ...Option) error {
 	}
 
 	model := reflect.New(elem).Interface()
-	query, queryOpt := db.QueryBuilder(model, opts...)
-	query = db.DefaultSort(model, query, queryOpt)
+	query, queryOpt := db.queryBuilder(model, opts...)
+	query = defaultSort(model, query, queryOpt)
 
 	//TODO: cache
 	//sql := db.ToSQL(func(tx *gorm.DB) *gorm.DB {
 	//	return tx.Find(list)
 	//})
-
 	if err := query.Find(list).Error; err != nil {
 		return WithStack(err)
 	}
@@ -446,15 +464,15 @@ func (db *DB) FindPage(list interface{}, opts ...Option) (int, error) {
 	}
 
 	model := reflect.New(elem).Interface()
-	query, queryOpt := db.QueryBuilder(model, opts...)
-	query = db.DefaultSort(model, query, queryOpt)
+	query, queryOpt := db.queryBuilder(model, opts...)
+	query = defaultSort(model, query, queryOpt)
 
 	var total int64 = 0
 	if err := query.Find(list).Error; err != nil {
 		return 0, WithStack(err)
 	}
 	if queryOpt.Pageable != nil {
-		if err := db.CountBuilder(query).Count(&total).Error; err != nil {
+		if err := countBuilder(query).Count(&total).Error; err != nil {
 			return 0, err
 		}
 	}
@@ -465,7 +483,7 @@ func (db *DB) FindPluck(model interface{}, opts ...Option) error {
 	if reflect.TypeOf(model).Kind() != reflect.Ptr || reflect.TypeOf(model).Elem().Kind() != reflect.Struct {
 		return WithStack(ErrorModel)
 	}
-	query, queryOpt := db.QueryBuilder(model, opts...)
+	query, queryOpt := db.queryBuilder(model, opts...)
 	if queryOpt.Pluck == nil {
 		return WithStack(ErrorPluck)
 	}
@@ -473,13 +491,4 @@ func (db *DB) FindPluck(model interface{}, opts ...Option) error {
 		return WithStack(err)
 	}
 	return nil
-}
-
-func (db *DB) isStruct(value interface{}) bool {
-	v := reflect.ValueOf(value)
-	if v.Kind() == reflect.Ptr {
-		return reflect.ValueOf(value).Elem().Kind() == reflect.Struct
-	} else {
-		return v.Kind() == reflect.Struct
-	}
 }

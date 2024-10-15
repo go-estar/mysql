@@ -18,6 +18,7 @@ type QueryOption struct {
 	Updates          map[string]interface{}
 	Select           Select
 	Omit             []string
+	IgnoreOmit       bool
 	Attend           []string
 	Join             [][]interface{}
 	Where            [][]interface{}
@@ -29,6 +30,7 @@ type QueryOption struct {
 	Pageable         *Pageable
 	Sort             []string
 	Pluck            []interface{}
+	Dest             interface{}
 	First            bool
 	Last             bool
 	WithDeleted      bool
@@ -39,22 +41,22 @@ type QueryOption struct {
 	ErrorNotSingle   error
 }
 
-func (db *DB) WithDB(val *gorm.DB) Option {
+func WithDB(val *gorm.DB) Option {
 	return func(opts *QueryOption) {
 		opts.DB = val
 	}
 }
-func (db *DB) WithTable(val string) Option {
+func WithTable(val string) Option {
 	return func(opts *QueryOption) {
 		opts.Table = val
 	}
 }
-func (db *DB) WithPrimaryKey(val string) Option {
+func WithPrimaryKey(val string) Option {
 	return func(opts *QueryOption) {
 		opts.PrimaryKey = val
 	}
 }
-func (db *DB) WithSelect(query string, args ...interface{}) Option {
+func WithSelect(query string, args ...interface{}) Option {
 	return func(opts *QueryOption) {
 		if opts.Select.Query != "" {
 			opts.Select.Query += ","
@@ -63,7 +65,7 @@ func (db *DB) WithSelect(query string, args ...interface{}) Option {
 		opts.Select.Args = append(opts.Select.Args, args...)
 	}
 }
-func (db *DB) WithSelectCondition(condition bool, query string, args ...interface{}) Option {
+func WithSelectCondition(condition bool, query string, args ...interface{}) Option {
 	return func(opts *QueryOption) {
 		if condition {
 			if opts.Select.Query != "" {
@@ -74,17 +76,22 @@ func (db *DB) WithSelectCondition(condition bool, query string, args ...interfac
 		}
 	}
 }
-func (db *DB) WithOmit(val ...string) Option {
+func WithIgnoreOmit() Option {
+	return func(opts *QueryOption) {
+		opts.IgnoreOmit = true
+	}
+}
+func WithOmit(val ...string) Option {
 	return func(opts *QueryOption) {
 		opts.Omit = append(opts.Omit, val...)
 	}
 }
-func (db *DB) WithAttend(val ...string) Option {
+func WithAttend(val ...string) Option {
 	return func(opts *QueryOption) {
 		opts.Attend = append(opts.Attend, val...)
 	}
 }
-func (db *DB) WithUpdates(val map[string]interface{}) Option {
+func WithUpdates(val map[string]interface{}) Option {
 	return func(opts *QueryOption) {
 		if opts.Updates == nil {
 			opts.Updates = map[string]interface{}{}
@@ -94,38 +101,38 @@ func (db *DB) WithUpdates(val map[string]interface{}) Option {
 		}
 	}
 }
-func (db *DB) WithJoin(query string, val ...interface{}) Option {
+func WithJoin(query string, val ...interface{}) Option {
 	return func(opts *QueryOption) {
 		opts.Join = append(opts.Join, []interface{}{query, val})
 	}
 }
-func (db *DB) WithJoinCondition(condition bool, query string, val ...interface{}) Option {
+func WithJoinCondition(condition bool, query string, val ...interface{}) Option {
 	return func(opts *QueryOption) {
 		if condition {
 			opts.Join = append(opts.Join, []interface{}{query, val})
 		}
 	}
 }
-func (db *DB) WithWhere(val ...interface{}) Option {
+func WithWhere(val ...interface{}) Option {
 	return func(opts *QueryOption) {
 		opts.Where = append(opts.Where, val)
 	}
 }
-func (db *DB) WithWhereCondition(condition bool, val ...interface{}) Option {
+func WithWhereCondition(condition bool, val ...interface{}) Option {
 	return func(opts *QueryOption) {
 		if condition {
 			opts.Where = append(opts.Where, val)
 		}
 	}
 }
-func (db *DB) WithWheres(val ...[]interface{}) Option {
+func WithWheres(val ...[]interface{}) Option {
 	return func(opts *QueryOption) {
 		for _, val := range val {
 			opts.Where = append(opts.Where, val)
 		}
 	}
 }
-func (db *DB) WithWheresCondition(condition bool, val ...[]interface{}) Option {
+func WithWheresCondition(condition bool, val ...[]interface{}) Option {
 	return func(opts *QueryOption) {
 		if condition {
 			for _, val := range val {
@@ -134,19 +141,19 @@ func (db *DB) WithWheresCondition(condition bool, val ...[]interface{}) Option {
 		}
 	}
 }
-func (db *DB) WithOr(val ...interface{}) Option {
+func WithOr(val ...interface{}) Option {
 	return func(opts *QueryOption) {
 		opts.Or = append(opts.Or, val)
 	}
 }
-func (db *DB) WithOrCondition(condition bool, val ...interface{}) Option {
+func WithOrCondition(condition bool, val ...interface{}) Option {
 	return func(opts *QueryOption) {
 		if condition {
 			opts.Or = append(opts.Or, val)
 		}
 	}
 }
-func (db *DB) WithFilters(val ...map[string]interface{}) Option {
+func WithFilters(val ...map[string]interface{}) Option {
 	return func(opts *QueryOption) {
 		if opts.Filters == nil {
 			opts.Filters = map[string]interface{}{}
@@ -158,85 +165,90 @@ func (db *DB) WithFilters(val ...map[string]interface{}) Option {
 		}
 	}
 }
-func (db *DB) WithGroup(val string) Option {
+func WithGroup(val string) Option {
 	return func(opts *QueryOption) {
 		opts.Group = val
 	}
 }
-func (db *DB) WithLimit(val int) Option {
+func WithLimit(val int) Option {
 	return func(opts *QueryOption) {
 		opts.Limit = val
 	}
 }
-func (db *DB) WithOffset(val int) Option {
+func WithOffset(val int) Option {
 	return func(opts *QueryOption) {
 		opts.Offset = val
 	}
 }
-func (db *DB) WithPage(page int, size int, sort string) Option {
+func WithPage(page int, size int, sort string) Option {
 	return func(opts *QueryOption) {
 		opts.Pageable = &Pageable{
 			Page: page, Size: size, Sort: sort,
 		}
 	}
 }
-func (db *DB) WithPageable(val *Pageable) Option {
+func WithPageable(val *Pageable) Option {
 	return func(opts *QueryOption) {
 		opts.Pageable = val
 	}
 }
-func (db *DB) WithSort(val ...string) Option {
+func WithSort(val ...string) Option {
 	return func(opts *QueryOption) {
 		opts.Sort = append(opts.Sort, val...)
 	}
 }
-func (db *DB) WithPluck(column string, val interface{}) Option {
+func WithPluck(column string, val interface{}) Option {
 	return func(opts *QueryOption) {
 		opts.Pluck = []interface{}{column, val}
 	}
 }
-func (db *DB) WithFirst() Option {
+func WithDest(dest interface{}) Option {
+	return func(opts *QueryOption) {
+		opts.Dest = dest
+	}
+}
+func WithFirst() Option {
 	return func(opts *QueryOption) {
 		opts.First = true
 	}
 }
-func (db *DB) WithLast() Option {
+func WithLast() Option {
 	return func(opts *QueryOption) {
 		opts.Last = true
 	}
 }
-func (db *DB) WithDeleted() Option {
+func WithDeleted() Option {
 	return func(opts *QueryOption) {
 		opts.WithDeleted = true
 	}
 }
-func (db *DB) WithIgnoreNotFound() Option {
+func WithIgnoreNotFound() Option {
 	return func(opts *QueryOption) {
 		opts.IgnoreNotFound = true
 	}
 }
-func (db *DB) WithMustAffected() Option {
+func WithMustAffected() Option {
 	return func(opts *QueryOption) {
 		opts.MustAffected = true
 	}
 }
-func (db *DB) WithErrorNotFound(val error) Option {
+func WithErrorNotFound(val error) Option {
 	return func(opts *QueryOption) {
 		opts.ErrorNotFound = val
 	}
 }
-func (db *DB) WithErrorNotAffected(val error) Option {
+func WithErrorNotAffected(val error) Option {
 	return func(opts *QueryOption) {
 		opts.ErrorNotAffected = val
 	}
 }
-func (db *DB) WithErrorNotSingle(val error) Option {
+func WithErrorNotSingle(val error) Option {
 	return func(opts *QueryOption) {
 		opts.ErrorNotSingle = val
 	}
 }
-func (db *DB) QueryBuilder(model interface{}, opts ...Option) (*gorm.DB, *QueryOption) {
 
+func (db *DB) queryBuilder(model interface{}, opts ...Option) (*gorm.DB, *QueryOption) {
 	queryOption := &QueryOption{}
 	for _, apply := range opts {
 		if apply != nil {
@@ -261,7 +273,7 @@ func (db *DB) QueryBuilder(model interface{}, opts ...Option) (*gorm.DB, *QueryO
 		query = query.Select(queryOption.Select.Query, queryOption.Select.Args...)
 	}
 
-	if len(queryOption.Omit) > 0 {
+	if !queryOption.IgnoreOmit && len(queryOption.Omit) > 0 {
 		query = query.Omit(queryOption.Omit...)
 	}
 
@@ -291,7 +303,7 @@ func (db *DB) QueryBuilder(model interface{}, opts ...Option) (*gorm.DB, *QueryO
 				//query = query.Where(wheres[0])
 				if (reflect.TypeOf(where[0]).Kind() == reflect.Ptr && reflect.TypeOf(where[0]).Elem().Kind() == reflect.Struct) ||
 					reflect.TypeOf(where[0]).Kind() == reflect.Struct {
-					query = query.Where(db.structToMap(where[0]))
+					query = query.Where(structToMap(query.Config,where[0]))
 				} else {
 					query = query.Where(where[0])
 				}
@@ -310,7 +322,7 @@ func (db *DB) QueryBuilder(model interface{}, opts ...Option) (*gorm.DB, *QueryO
 				//query = query.Or(wheres[0])
 				if (reflect.TypeOf(or[0]).Kind() == reflect.Ptr && reflect.TypeOf(or[0]).Elem().Kind() == reflect.Struct) ||
 					reflect.TypeOf(or[0]).Kind() == reflect.Struct {
-					query = query.Or(db.structToMap(or[0]))
+					query = query.Or(structToMap(query.Config,or[0]))
 				} else {
 					query = query.Or(or[0])
 				}
@@ -348,7 +360,7 @@ func (db *DB) QueryBuilder(model interface{}, opts ...Option) (*gorm.DB, *QueryO
 		}
 		if _, ok := modelT.FieldByName("Deleted"); ok {
 			tableName := db.Config.NamingStrategy.TableName(modelT.Name())
-			if v := GetTableName(model); v != "" {
+			if v := getTableName(model); v != "" {
 				tableName = v
 			}
 			query = query.Where(tableName + ".deleted = 0")
@@ -356,19 +368,19 @@ func (db *DB) QueryBuilder(model interface{}, opts ...Option) (*gorm.DB, *QueryO
 	}
 
 	if queryOption.Filters != nil {
-		query = db.Filters(query, queryOption.Filters)
+		query = Filters(query, queryOption.Filters)
 	}
 
 	return query, queryOption
 }
 
-func (db *DB) CountBuilder(query *gorm.DB) *gorm.DB {
+func countBuilder(query *gorm.DB) *gorm.DB {
 	return query.Select("*").Limit(-1).Offset(-1)
 }
 
-func (db *DB) DefaultSort(model interface{}, query *gorm.DB, queryOption *QueryOption) *gorm.DB {
+func defaultSort(model interface{}, query *gorm.DB, queryOption *QueryOption) *gorm.DB {
 	if (queryOption.Pageable == nil || queryOption.Pageable.Sort == "") && queryOption.Sort == nil {
-		if primaryKey := db.getPKName(model); primaryKey != "" {
+		if primaryKey := getPKName(query.Config,model); primaryKey != "" {
 			query = query.Order(primaryKey + " desc")
 		}
 	}
