@@ -100,7 +100,7 @@ func (b *Service[T]) FindTitle(id interface{}, opts ...Option) (*TitleRes, error
 			opts,
 			WithSelect(b.TitleQuery+" as title"),
 			WithDest(title),
-		)...
+		)...,
 	); err != nil {
 		return nil, err
 	}
@@ -131,7 +131,6 @@ func (b *Service[T]) FindOne(opts ...Option) (*T, error) {
 	}
 	return model, nil
 }
-
 
 func (b *Service[T]) FindAll(opts ...Option) (*[]*T, error) {
 	list := b.NewModelList()
@@ -183,22 +182,22 @@ func (b *Service[T]) UpdateWithUserId(value *T, userId int, opts ...Option) (*T,
 	return b.Update(value, opts...)
 }
 
-func (b *Service[T]) UpdateById(id interface{}, value interface{}, opts ...Option) (error) {
+func (b *Service[T]) UpdateById(id interface{}, value interface{}, opts ...Option) error {
 	model, err := b.NewModelWithId(id)
 	if err != nil {
-		return  err
+		return err
 	}
 	if err := b.DB.UpdateById(
 		model,
 		value,
 		opts...,
 	); err != nil {
-		return  err
+		return err
 	}
 	return nil
 }
 
-func (b *Service[T]) UpdateByIdWithUserId(id interface{}, value interface{}, userId int, opts ...Option) ( error) {
+func (b *Service[T]) UpdateByIdWithUserId(id interface{}, value interface{}, userId int, opts ...Option) error {
 	SetUpdatedBy(value, userId)
 	return b.UpdateById(id, value, opts...)
 }
@@ -238,7 +237,7 @@ func (b *Service[T]) Remove(value *T, opts ...Option) error {
 	return b.DB.UpdateById(
 		value,
 		value,
-		append(opts,WithAttend("updatedAt", "updatedBy", "deleted"))...
+		append(opts, WithAttend("updatedAt", "updatedBy", "deleted"))...,
 	)
 }
 
@@ -262,6 +261,14 @@ func (b *Service[T]) RemoveByIdWithUserId(id interface{}, userId int, opts ...Op
 	}
 	SetUpdatedBy(model, userId)
 	return b.Remove(model, opts...)
+}
+
+func (b *Service[T]) DeleteById(id interface{}, opts ...Option) error {
+	model, err := b.NewModelWithId(id)
+	if err != nil {
+		return err
+	}
+	return b.DB.DeleteById(model, opts...)
 }
 
 func SetCreatedBy(value interface{}, userId int) {
