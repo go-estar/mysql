@@ -12,7 +12,7 @@ type IdReq struct {
 }
 
 type FilterReq struct {
-	Filters map[string]interface{}
+	Filters map[string]interface{} `json:"filters"`
 }
 
 type Pageable struct {
@@ -99,6 +99,7 @@ func (b *Service[T]) FindTitle(id interface{}, opts ...Option) (*TitleRes, error
 		append(
 			opts,
 			WithSelect(b.TitleQuery+" as title"),
+			WithWhere(getPKName(b.DB.Config, model)+"=?", id),
 			WithDest(title),
 		)...,
 	); err != nil {
@@ -156,14 +157,14 @@ func (b *Service[T]) FindPage(opts ...Option) (*PageRes[T], error) {
 	return &PageRes[T]{Total: total, List: list}, nil
 }
 
-func (b *Service[T]) Create(value *T) (*T, error) {
-	err := b.DB.Create(value)
+func (b *Service[T]) Create(value *T, opts ...Option) (*T, error) {
+	err := b.DB.Create(value, opts...)
 	return value, err
 }
 
-func (b *Service[T]) CreateWithUserId(value *T, userId int) (*T, error) {
+func (b *Service[T]) CreateWithUserId(value *T, userId int, opts ...Option) (*T, error) {
 	SetCreatedBy(value, userId)
-	return b.Create(value)
+	return b.Create(value, opts...)
 }
 
 func (b *Service[T]) Update(value *T, opts ...Option) (*T, error) {
