@@ -7,6 +7,46 @@ import (
 	"strings"
 )
 
+
+type IdReq struct {
+	Id int `json:"id" validate:"required"`
+}
+type Id64Req struct {
+	Id int64 `json:"id,string" validate:"required"`
+}
+
+type IdListReq struct {
+	IdList []int `json:"idList" validate:"required"`
+}
+
+type Id64ListReq[T any] struct {
+	IdList []int64 `json:"idList" validate:"required"`
+}
+
+type FilterReq struct {
+	Filters map[string]interface{} `json:"filters"`
+}
+
+type Pageable struct {
+	Page int    `json:"page"`
+	Size int    `json:"size"`
+	Sort string `json:"sort"`
+}
+
+type PageReq struct {
+	*Pageable `validate:"required"`
+	Filters   map[string]interface{} `json:"filters"`
+}
+
+type PageRes[T any] struct {
+	List  *[]*T `json:"list"`
+	Total int   `json:"total"`
+}
+
+type TitleRes struct {
+	Title string `json:"title"`
+}
+
 type IntArray []int
 
 func (a *IntArray) Scan(src any) error {
@@ -32,7 +72,7 @@ func (a *IntArray) Scan(src any) error {
 
 func (a IntArray) Value() (driver.Value, error) {
 	if len(a) == 0 {
-		return nil, nil
+		return "", nil
 	}
 	val := ""
 	for _, v := range a {
@@ -61,7 +101,30 @@ func (a *StringArray) Scan(src any) error {
 
 func (a StringArray) Value() (driver.Value, error) {
 	if len(a) == 0 {
-		return nil, nil
+		return "", nil
 	}
 	return strings.Join(a, ","), nil
 }
+
+//type StringArrayList []StringArray
+//
+//func (a *StringArrayList) Scan(src any) error {
+//	bytes, ok := src.([]byte)
+//	if !ok {
+//		return errors.New("src value cannot cast to []byte")
+//	}
+//	if string(bytes) == "" {
+//		*a = make([]StringArray, 0)
+//		return nil
+//	}
+//	tmp := strings.Split(string(bytes), ",")
+//
+//	return nil
+//}
+//
+//func (a StringArrayList) Value() (driver.Value, error) {
+//	if len(a) == 0 {
+//		return "", nil
+//	}
+//	return strings.Join(a, ","), nil
+//}

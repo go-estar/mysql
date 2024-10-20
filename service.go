@@ -1,39 +1,10 @@
 package mysql
 
 import (
-	"encoding/json"
 	"errors"
 	"reflect"
 	"time"
 )
-
-type IdReq struct {
-	Id json.Number `json:"id" validate:"required"`
-}
-
-type FilterReq struct {
-	Filters map[string]interface{} `json:"filters"`
-}
-
-type Pageable struct {
-	Page int    `json:"page"`
-	Size int    `json:"size"`
-	Sort string `json:"sort"`
-}
-
-type PageReq struct {
-	*Pageable `validate:"required"`
-	Filters   map[string]interface{} `json:"filters"`
-}
-
-type PageRes[T any] struct {
-	List  *[]*T `json:"list"`
-	Total int   `json:"total"`
-}
-
-type TitleRes struct {
-	Title string `json:"title"`
-}
 
 type Service[T any] struct {
 	DB         *DB

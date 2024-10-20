@@ -365,7 +365,7 @@ func (db *DB) Find(model interface{}, opts ...Option) error {
 
 	if err := query.Error; err != nil {
 		if db.IsRecordNotFoundError(err) {
-			if queryOpt.IgnoreNotFound || queryOpt.First || queryOpt.Last {
+			if queryOpt.IgnoreNotFound {
 				return nil
 			} else {
 				if err := queryOpt.ErrorNotFound; err != nil {
