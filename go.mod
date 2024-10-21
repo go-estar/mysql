@@ -1,14 +1,15 @@
 module github.com/go-estar/mysql
 
-go 1.21.0
+go 1.22.0
+
+toolchain go1.22.8
 
 require (
 	github.com/go-estar/base-error v1.0.7
 	github.com/go-estar/config v1.0.0
-	github.com/go-estar/logger v1.0.0
+	github.com/go-estar/logger v1.0.1
 	github.com/go-estar/types v1.0.3
 	github.com/go-sql-driver/mysql v1.8.1
-	github.com/jinzhu/copier v0.4.0
 	github.com/pkg/errors v0.9.1
 	gorm.io/driver/mysql v1.5.7
 	gorm.io/gorm v1.25.12
@@ -33,9 +34,9 @@ require (
 	github.com/subosito/gotenv v1.6.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.27.0 // indirect
-	golang.org/x/exp v0.0.0-20240904232852-e7e105dedf7e // indirect
-	golang.org/x/sys v0.25.0 // indirect
-	golang.org/x/text v0.18.0 // indirect
+	golang.org/x/exp v0.0.0-20241009180824-f66d83c29e7c // indirect
+	golang.org/x/sys v0.26.0 // indirect
+	golang.org/x/text v0.19.0 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
