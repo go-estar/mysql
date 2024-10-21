@@ -118,7 +118,7 @@ func (db *DB) CloneById(model interface{}, opts ...Option) (interface{}, error) 
 	if err := setPKValue(clone, pk.Name, pk.Value); err != nil {
 		return nil, err
 	}
-	opts = append(opts,WithIgnoreOmit())
+	opts = append(opts, WithIgnoreOmit())
 	if err := db.FindById(clone, opts...); err != nil {
 		return nil, err
 	}
@@ -130,7 +130,7 @@ func (db *DB) CloneOne(model interface{}, opts ...Option) (interface{}, error) {
 		return nil, WithStack(ErrorModel)
 	}
 	clone := reflect.New(reflect.TypeOf(model).Elem()).Interface()
-	opts = append(opts,WithIgnoreOmit())
+	opts = append(opts, WithIgnoreOmit())
 	if err := db.FindOne(clone, opts...); err != nil {
 		return nil, err
 	}
@@ -245,7 +245,7 @@ func (db *DB) UpdateById(model interface{}, values interface{}, opts ...Option) 
 		return WithStack(ErrorModel)
 	}
 	if isStruct(values) {
-		_, err := db.UpdateByIdWithChangedValues(model, values, opts...)
+		_, err := db.UpdateByIdReturnChangedValues(model, values, opts...)
 		return err
 	}
 	query, queryOpt := db.queryBuilder(model, opts...)
@@ -256,7 +256,7 @@ func (db *DB) UpdateById(model interface{}, values interface{}, opts ...Option) 
 	return err
 }
 
-func (db *DB) UpdateByIdWithChangedValues(model interface{}, values interface{}, opts ...Option) (map[string]interface{}, error) {
+func (db *DB) UpdateByIdReturnChangedValues(model interface{}, values interface{}, opts ...Option) (map[string]interface{}, error) {
 	if reflect.TypeOf(model).Kind() != reflect.Ptr || reflect.TypeOf(model).Elem().Kind() != reflect.Struct {
 		return nil, WithStack(ErrorModel)
 	}
@@ -283,7 +283,7 @@ func (db *DB) UpdateOne(model interface{}, values interface{}, opts ...Option) e
 		return WithStack(ErrorModel)
 	}
 	if isStruct(values) {
-		_, err := db.UpdateOneWithChangedValues(model, values, opts...)
+		_, err := db.UpdateOneReturnChangedValues(model, values, opts...)
 		return err
 	}
 	query, queryOpt := db.queryBuilder(model, opts...)
@@ -312,7 +312,7 @@ func (db *DB) UpdateOne(model interface{}, values interface{}, opts ...Option) e
 	return err
 }
 
-func (db *DB) UpdateOneWithChangedValues(model interface{}, values interface{}, opts ...Option) (map[string]interface{}, error) {
+func (db *DB) UpdateOneReturnChangedValues(model interface{}, values interface{}, opts ...Option) (map[string]interface{}, error) {
 	if reflect.TypeOf(model).Kind() != reflect.Ptr || reflect.TypeOf(model).Elem().Kind() != reflect.Struct {
 		return nil, WithStack(ErrorModel)
 	}

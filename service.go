@@ -138,7 +138,8 @@ func (b *Service[T]) CreateWithUserId(value *T, userId int, opts ...Option) (*T,
 	return b.Create(value, opts...)
 }
 
-func (b *Service[T]) Update(value *T, opts ...Option) (*T, error) {
+func (b *Service[T]) UpdateWithUserId(value *T, userId int, opts ...Option) (*T, error) {
+	SetUpdatedBy(value, userId)
 	if err := b.DB.UpdateById(
 		value,
 		value,
@@ -149,9 +150,13 @@ func (b *Service[T]) Update(value *T, opts ...Option) (*T, error) {
 	return value, nil
 }
 
-func (b *Service[T]) UpdateWithUserId(value *T, userId int, opts ...Option) (*T, error) {
+func (b *Service[T]) UpdateWithUserIdReturnChangedValues(value *T, userId int, opts ...Option) (map[string]any, error) {
 	SetUpdatedBy(value, userId)
-	return b.Update(value, opts...)
+	return b.DB.UpdateByIdReturnChangedValues(
+		value,
+		value,
+		opts...,
+	)
 }
 
 func (b *Service[T]) UpdateById(id interface{}, value interface{}, opts ...Option) error {
