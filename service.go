@@ -150,13 +150,18 @@ func (b *Service[T]) UpdateWithUserId(value *T, userId int, opts ...Option) (*T,
 	return value, nil
 }
 
-func (b *Service[T]) UpdateWithUserIdReturnChangedValues(value *T, userId int, opts ...Option) (map[string]any, error) {
+func (b *Service[T]) UpdateWithUserIdReturnChangedValues(value *T, userId int, opts ...Option) (map[string]any, *T, error) {
 	SetUpdatedBy(value, userId)
-	return b.DB.UpdateByIdReturnChangedValues(
+	updates,orig,err := b.DB.UpdateByIdReturnChangedValues(
 		value,
 		value,
 		opts...,
 	)
+	if err != nil {
+		return nil, nil, err
+	}
+	origValue  := orig.(*T)
+	return updates, origValue, err
 }
 
 func (b *Service[T]) UpdateById(id interface{}, value interface{}, opts ...Option) error {

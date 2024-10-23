@@ -245,7 +245,7 @@ func (db *DB) UpdateById(model interface{}, values interface{}, opts ...Option) 
 		return WithStack(ErrorModel)
 	}
 	if isStruct(values) {
-		_, err := db.UpdateByIdReturnChangedValues(model, values, opts...)
+		_, _, err := db.UpdateByIdReturnChangedValues(model, values, opts...)
 		return err
 	}
 	query, queryOpt := db.queryBuilder(model, opts...)
@@ -256,26 +256,23 @@ func (db *DB) UpdateById(model interface{}, values interface{}, opts ...Option) 
 	return err
 }
 
-func (db *DB) UpdateByIdReturnChangedValues(model interface{}, values interface{}, opts ...Option) (map[string]interface{}, error) {
+func (db *DB) UpdateByIdReturnChangedValues(model interface{}, values interface{}, opts ...Option) (map[string]interface{}, interface{}, error) {
 	if reflect.TypeOf(model).Kind() != reflect.Ptr || reflect.TypeOf(model).Elem().Kind() != reflect.Struct {
-		return nil, WithStack(ErrorModel)
+		return nil, nil, WithStack(ErrorModel)
 	}
 	clone, err := db.CloneById(model, opts...)
 	if err != nil {
-		return nil, err
-	}
-	if clone == nil {
-		return nil, nil
+		return nil, nil, err
 	}
 	updates, err := getUpdateValue(db.Config, clone, values)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	_, err = db.UpdateAll(model, updates, opts...)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return updates, nil
+	return updates, clone, nil
 }
 
 func (db *DB) UpdateOne(model interface{}, values interface{}, opts ...Option) error {
@@ -283,7 +280,7 @@ func (db *DB) UpdateOne(model interface{}, values interface{}, opts ...Option) e
 		return WithStack(ErrorModel)
 	}
 	if isStruct(values) {
-		_, err := db.UpdateOneReturnChangedValues(model, values, opts...)
+		_, _, err := db.UpdateOneReturnChangedValues(model, values, opts...)
 		return err
 	}
 	query, queryOpt := db.queryBuilder(model, opts...)
@@ -312,26 +309,23 @@ func (db *DB) UpdateOne(model interface{}, values interface{}, opts ...Option) e
 	return err
 }
 
-func (db *DB) UpdateOneReturnChangedValues(model interface{}, values interface{}, opts ...Option) (map[string]interface{}, error) {
+func (db *DB) UpdateOneReturnChangedValues(model interface{}, values interface{}, opts ...Option) (map[string]interface{}, interface{}, error) {
 	if reflect.TypeOf(model).Kind() != reflect.Ptr || reflect.TypeOf(model).Elem().Kind() != reflect.Struct {
-		return nil, WithStack(ErrorModel)
+		return nil, nil, WithStack(ErrorModel)
 	}
 	clone, err := db.CloneOne(model, opts...)
 	if err != nil {
-		return nil, err
-	}
-	if clone == nil {
-		return nil, nil
+		return nil, nil, err
 	}
 	updates, err := getUpdateValue(db.Config, clone, values)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	_, err = db.UpdateAll(model, updates, opts...)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return updates, nil
+	return updates, clone, nil
 }
 
 func (db *DB) UpdateOneOrCreate(model interface{}, opts ...Option) error {
