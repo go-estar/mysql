@@ -3,10 +3,10 @@ package mysql
 import (
 	"database/sql/driver"
 	"errors"
+	"github.com/shopspring/decimal"
 	"strconv"
 	"strings"
 )
-
 
 type IdReq struct {
 	Id int `json:"id" validate:"required"`
@@ -106,25 +106,39 @@ func (a StringArray) Value() (driver.Value, error) {
 	return strings.Join(a, ","), nil
 }
 
-//type StringArrayList []StringArray
-//
-//func (a *StringArrayList) Scan(src any) error {
-//	bytes, ok := src.([]byte)
-//	if !ok {
-//		return errors.New("src value cannot cast to []byte")
-//	}
-//	if string(bytes) == "" {
-//		*a = make([]StringArray, 0)
-//		return nil
-//	}
-//	tmp := strings.Split(string(bytes), ",")
-//
-//	return nil
-//}
-//
-//func (a StringArrayList) Value() (driver.Value, error) {
-//	if len(a) == 0 {
-//		return "", nil
-//	}
-//	return strings.Join(a, ","), nil
-//}
+type DecimalArray []decimal.Decimal
+
+func (a *DecimalArray) Scan(src any) error {
+	bytes, ok := src.([]byte)
+	if !ok {
+		return errors.New("src value cannot cast to []byte")
+	}
+	var arr = make([]decimal.Decimal, 0)
+	if string(bytes) == "" {
+		*a = arr
+		return nil
+	}
+	for _, val := range strings.Split(string(bytes), ",") {
+		i, err := decimal.NewFromString(val)
+		if err != nil {
+			return err
+		}
+		arr = append(arr, i)
+	}
+	*a = arr
+	return nil
+}
+
+func (a DecimalArray) Value() (driver.Value, error) {
+	if len(a) == 0 {
+		return "", nil
+	}
+	val := ""
+	for _, v := range a {
+		if val != "" {
+			val += ","
+		}
+		val += v.String()
+	}
+	return val, nil
+}
