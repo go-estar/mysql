@@ -84,6 +84,20 @@ func (a IntArray) Value() (driver.Value, error) {
 	return val, nil
 }
 
+func (a IntArray) String() string {
+	if len(a) == 0 {
+		return ""
+	}
+	val := ""
+	for _, v := range a {
+		if val != "" {
+			val += ","
+		}
+		val += strconv.Itoa(v)
+	}
+	return val
+}
+
 type StringArray []string
 
 func (a *StringArray) Scan(src any) error {
@@ -104,6 +118,13 @@ func (a StringArray) Value() (driver.Value, error) {
 		return "", nil
 	}
 	return strings.Join(a, ","), nil
+}
+
+func (a StringArray) String() string {
+	if len(a) == 0 {
+		return ""
+	}
+	return strings.Join(a, ",")
 }
 
 type DecimalArray []decimal.Decimal
@@ -141,4 +162,18 @@ func (a DecimalArray) Value() (driver.Value, error) {
 		val += v.String()
 	}
 	return val, nil
+}
+
+func (a DecimalArray) String() string {
+	if len(a) == 0 {
+		return ""
+	}
+	val := ""
+	for _, v := range a {
+		if val != "" {
+			val += ","
+		}
+		val += v.String()
+	}
+	return val
 }

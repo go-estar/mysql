@@ -7,6 +7,31 @@ import (
 
 type Option func(*QueryOption)
 
+type Options struct {
+	list *[]Option
+}
+
+func NewOptions(opts ...Option) Options {
+	return Options{
+		list: &opts,
+	}
+}
+
+func (o Options) Append(opts ...Option) []Option {
+	*o.list = append(*o.list,opts...)
+	return *o.list
+}
+
+func (o Options) Appends(opts []Option) []Option {
+	*o.list = append(*o.list,opts...)
+	return *o.list
+}
+
+func (o Options) List() []Option {
+	return *o.list
+}
+
+
 type Select struct {
 	Query string
 	Args  []interface{}
